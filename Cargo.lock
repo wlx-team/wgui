@@ -15,6 +15,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7c02d123df017efcdfbd739ef81735b36c5ba83ec3c59c80a9d7ecc718f92e50"
 
 [[package]]
+name = "glam"
+version = "0.30.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6b46b9ca4690308844c644e7c634d68792467260e051c8543e0c7871662b3ba7"
+
+[[package]]
 name = "grid"
 version = "0.16.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -107,5 +113,6 @@ name = "wgui"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "glam",
  "taffy",
 ]

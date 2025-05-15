@@ -30,8 +30,8 @@ fn run() -> Result<(), String> {
 	let mut frames: u32 = 0;
 	let mut last_frames_tick: u64 = 0;
 
-	println!("Capping at 30 FPS");
-	let mut rate = time::Rate::new(30);
+	println!("Capping at 60 FPS");
+	let mut rate = time::Rate::new(60);
 
 	let mut testbed = Testbed::new().unwrap();
 

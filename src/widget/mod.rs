@@ -1,11 +1,5 @@
-use taffy::Style;
-
-use crate::layout::Layout;
-
-use super::{
-	drawing::{self, RenderPrimitive},
-	layout::WidgetHandle,
-};
+use super::{drawing::RenderPrimitive, layout::WidgetHandle};
+use crate::{layout::Layout, transform_stack::TransformStack};
 
 pub mod div;
 pub mod rectangle;
@@ -32,6 +26,7 @@ impl WidgetData {
 pub struct DrawParams<'a> {
 	pub layout: &'a Layout,
 	pub primitives: &'a mut Vec<RenderPrimitive>,
+	pub transform_stack: &'a mut TransformStack,
 }
 
 pub trait Widget {

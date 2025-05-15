@@ -1,8 +1,9 @@
 use tiny_skia::{Paint, Pixmap};
 use wgui::{
 	drawing::{self, RenderPrimitive},
+	glam::Vec2,
 	layout::Layout,
-	taffy::{self, prelude::length},
+	taffy::{self, AlignContent, AlignItems, FlexDirection, prelude::length},
 	widget::rectangle::{Rectangle, RectangleParams},
 };
 
@@ -14,89 +15,78 @@ impl Testbed {
 	pub fn new() -> anyhow::Result<Self> {
 		let mut layout = Layout::new()?;
 
-		let rect = layout.add_child(
+		let container = layout.add_child(
 			layout.root,
+			Rectangle::new(RectangleParams {
+				color: drawing::Color([0.8, 0.8, 0.8, 1.0]),
+			})?,
+			taffy::Style {
+				flex_direction: FlexDirection::Row,
+				size: taffy::Size::percent(1.0),
+				..Default::default()
+			},
+		)?;
+
+		let first_rect = layout.add_child(
+			container,
 			Rectangle::new(RectangleParams {
 				color: drawing::Color([0.8, 0.5, 0.2, 1.0]),
 			})?,
 			taffy::Style {
-				size: taffy::Size {
-					width: length(128.0),
-					height: length(32.0),
-				},
-				margin: taffy::Rect {
-					top: length(8.0),
-					left: length(8.0),
-					right: length(8.0),
-					bottom: length(8.0),
-				},
+				size: taffy::Size::percent(1.0),
+				flex_wrap: taffy::FlexWrap::Wrap,
+				align_items: Some(AlignItems::FlexStart),
+				align_content: Some(AlignContent::FlexStart),
 				..Default::default()
 			},
 		)?;
 
-		let subrect = layout.add_child(
-			rect,
+		let _second_rect = layout.add_child(
+			container,
 			Rectangle::new(RectangleParams {
-				color: drawing::Color([1.0, 0.2, 0.6, 1.0]),
+				color: drawing::Color([0.5, 0.8, 0.2, 1.0]),
 			})?,
 			taffy::Style {
-				size: taffy::Size {
-					width: length(64.0),
-					height: length(64.0),
-				},
-				margin: taffy::Rect {
-					top: length(8.0),
-					left: length(8.0),
-					right: length(8.0),
-					bottom: length(8.0),
-				},
+				size: taffy::Size::percent(1.0),
 				..Default::default()
 			},
 		)?;
 
-		let _subsubrect = layout.add_child(
-			subrect,
+		let _third_rect = layout.add_child(
+			container,
 			Rectangle::new(RectangleParams {
-				color: drawing::Color([0.0, 0.2, 1.0, 1.0]),
+				color: drawing::Color([0.2, 0.5, 0.8, 1.0]),
 			})?,
 			taffy::Style {
-				size: taffy::Size {
-					width: length(96.0),
-					height: length(32.0),
-				},
-				margin: taffy::Rect {
-					top: length(8.0),
-					left: length(8.0),
-					right: length(8.0),
-					bottom: length(8.0),
-				},
+				size: taffy::Size::percent(1.0),
 				..Default::default()
 			},
 		)?;
+
+		// add some boxes to a first rect
+
+		for i in 0..40 {
+			let _ = layout.add_child(
+				first_rect,
+				Rectangle::new(RectangleParams {
+					color: drawing::Color([1.0 - (i as f32 / 40.0), 0.0, i as f32 / 40.0, 1.0]),
+				})?,
+				taffy::Style {
+					size: taffy::Size {
+						width: length(4.0 + i as f32 * 2.0),
+						height: length(32.0),
+					},
+					margin: taffy::Rect::length(8.0),
+					..Default::default()
+				},
+			)?;
+		}
 
 		Ok(Self { layout })
 	}
 
 	pub fn update(&mut self, width: f32, height: f32) -> anyhow::Result<()> {
-		let root_node = self
-			.layout
-			.widgets
-			.get(&self.layout.root)
-			.unwrap()
-			.data()
-			.node;
-
-		if self.layout.tree.dirty(root_node)? {
-			println!("re-computing layout");
-			self.layout.tree.compute_layout(
-				root_node,
-				taffy::Size {
-					width: taffy::AvailableSpace::Definite(width),
-					height: taffy::AvailableSpace::Definite(height),
-				},
-			)?;
-		}
-
+		self.layout.update(Vec2::new(width, height))?;
 		Ok(())
 	}
 

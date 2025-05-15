@@ -1,6 +1,7 @@
 use super::widget::{Widget, div::Div};
 use crate::gen_id;
-use taffy::{TaffyTree, prelude::length};
+use glam::Vec2;
+use taffy::TaffyTree;
 
 pub type BoxedWidget = Box<dyn Widget>;
 gen_id!(WidgetVec, BoxedWidget, WidgetCell, WidgetHandle);
@@ -9,6 +10,8 @@ pub struct Layout {
 	pub tree: TaffyTree<WidgetHandle>,
 	pub widgets: WidgetVec,
 	pub root: WidgetHandle,
+
+	pub prev_size: Vec2,
 }
 
 fn add_child_internal(
@@ -86,10 +89,7 @@ impl Layout {
 			None, /* no parent node */
 			Div::new()?,
 			taffy::Style {
-				size: taffy::Size {
-					width: length(800.0),
-					height: length(600.0),
-				},
+				size: taffy::Size::percent(1.0),
 				..Default::default()
 			},
 		)?;
@@ -98,6 +98,25 @@ impl Layout {
 			tree,
 			widgets,
 			root,
+			prev_size: Vec2::default(),
 		})
+	}
+
+	pub fn update(&mut self, size: Vec2) -> anyhow::Result<()> {
+		let root_node = self.widgets.get(&self.root).unwrap().data().node;
+
+		if self.tree.dirty(root_node)? || self.prev_size != size {
+			println!("re-computing layout, size {}x{}", size.x, size.y);
+			self.prev_size = size;
+			self.tree.compute_layout(
+				root_node,
+				taffy::Size {
+					width: taffy::AvailableSpace::Definite(size.x),
+					height: taffy::AvailableSpace::Definite(size.y),
+				},
+			)?;
+		}
+
+		Ok(())
 	}
 }

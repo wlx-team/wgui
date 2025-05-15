@@ -5,4 +5,5 @@ edition = "2024"
 
 [dependencies]
 anyhow = "1.0.98"
+glam = "0.30.3"
 taffy = "0.8.1"

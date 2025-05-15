@@ -1,4 +1,6 @@
-use taffy::prelude::TaffyMaxContent;
+use glam::Vec2;
+
+use crate::transform_stack::{Transform, TransformStack};
 
 use super::{
 	layout::{BoxedWidget, Layout},
@@ -17,13 +19,14 @@ pub struct Boundary {
 }
 
 impl Boundary {
-	// TODO: transform stack support, currently it's positioned relative to a parent(!)
-	pub fn from_taffy(layout: &taffy::Layout) -> Self {
+	pub fn construct(transform_stack: &TransformStack) -> Self {
+		let transform = transform_stack.get();
+
 		Self {
-			x: layout.content_box_x(),
-			y: layout.content_box_y(),
-			w: layout.content_box_width(),
-			h: layout.content_box_height(),
+			x: transform.pos.x,
+			y: transform.pos.y,
+			w: transform.dim.x,
+			h: transform.dim.y,
 		}
 	}
 }
@@ -54,6 +57,16 @@ pub enum RenderPrimitive {
 }
 
 fn draw_children(layout: &Layout, params: &mut DrawParams, widget: &BoxedWidget) {
+	let Ok(l) = layout.tree.layout(widget.data().node) else {
+		debug_assert!(false);
+		return;
+	};
+
+	params.transform_stack.push(Transform {
+		pos: Vec2::new(l.content_box_x(), l.content_box_y()),
+		dim: Vec2::new(l.content_box_width(), l.content_box_height()),
+	});
+
 	widget.draw(params);
 
 	for handle in widget.data().children.iter() {
@@ -64,18 +77,21 @@ fn draw_children(layout: &Layout, params: &mut DrawParams, widget: &BoxedWidget)
 
 		draw_children(layout, params, child);
 	}
+
+	params.transform_stack.pop();
 }
 
-// TODO: transform stack support
 pub fn draw(layout: &Layout) -> anyhow::Result<Vec<RenderPrimitive>> {
 	let Some(root) = layout.widgets.get(&layout.root) else {
 		panic!("root widget doesn't exist"); // This shouldn't happen
 	};
 
 	let mut primitives = Vec::<RenderPrimitive>::new();
+	let mut transform_stack = TransformStack::new();
 
 	let mut params = DrawParams {
 		primitives: &mut primitives,
+		transform_stack: &mut transform_stack,
 		layout,
 	};
 
