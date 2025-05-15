@@ -107,12 +107,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "once_cell"
-version = "1.21.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "42f5e15c9953c5e4ccceeb2e7382a716482c34515315f7b03532b8b4e8393d2d"
-
-[[package]]
 name = "png"
 version = "0.17.16"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -287,7 +281,6 @@ name = "wgui_uidev"
 version = "0.1.0"
 dependencies = [
  "anyhow",
- "once_cell",
  "sdl2",
  "tiny-skia",
  "wgui",

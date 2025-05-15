@@ -1,7 +1,9 @@
-use once_cell::sync::Lazy;
-use std::time::{Duration, Instant};
+use std::{
+	sync::LazyLock,
+	time::{Duration, Instant},
+};
 
-static TIME_START: Lazy<Instant> = Lazy::new(Instant::now);
+static TIME_START: LazyLock<Instant> = LazyLock::new(Instant::now);
 
 pub fn get_millis() -> u64 {
     TIME_START.elapsed().as_millis() as u64
