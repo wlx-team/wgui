@@ -1,3 +1,5 @@
+use taffy::prelude::TaffyMaxContent;
+
 use super::{
 	layout::{BoxedWidget, Layout},
 	widget::DrawParams,
@@ -12,6 +14,18 @@ pub struct Boundary {
 	pub y: f32,
 	pub w: f32,
 	pub h: f32,
+}
+
+impl Boundary {
+	// TODO: transform stack support, currently it's positioned relative to a parent(!)
+	pub fn from_taffy(layout: &taffy::Layout) -> Self {
+		Self {
+			x: layout.content_box_x(),
+			y: layout.content_box_y(),
+			w: layout.content_box_width(),
+			h: layout.content_box_height(),
+		}
+	}
 }
 
 #[derive(Copy, Clone)]
@@ -52,7 +66,8 @@ fn draw_children(layout: &Layout, params: &mut DrawParams, widget: &BoxedWidget)
 	}
 }
 
-pub fn draw(layout: &Layout) -> Vec<RenderPrimitive> {
+// TODO: transform stack support
+pub fn draw(layout: &Layout) -> anyhow::Result<Vec<RenderPrimitive>> {
 	let Some(root) = layout.widgets.get(&layout.root) else {
 		panic!("root widget doesn't exist"); // This shouldn't happen
 	};
@@ -61,9 +76,10 @@ pub fn draw(layout: &Layout) -> Vec<RenderPrimitive> {
 
 	let mut params = DrawParams {
 		primitives: &mut primitives,
+		layout,
 	};
 
 	draw_children(layout, &mut params, root);
 
-	primitives
+	Ok(primitives)
 }

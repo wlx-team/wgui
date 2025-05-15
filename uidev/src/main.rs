@@ -33,7 +33,7 @@ fn run() -> Result<(), String> {
 	println!("Capping at 30 FPS");
 	let mut rate = time::Rate::new(30);
 
-	let testbed = Testbed::new().unwrap();
+	let mut testbed = Testbed::new().unwrap();
 
 	'running: loop {
 		rate.start();
@@ -55,7 +55,10 @@ fn run() -> Result<(), String> {
 
 		let mut pixmap = Pixmap::new(width, height).unwrap();
 
-		testbed.draw(&mut pixmap, &transform);
+		testbed
+			.update(pixmap.width() as f32, pixmap.height() as f32)
+			.unwrap();
+		testbed.draw(&mut pixmap, &transform).unwrap();
 
 		let window_surface = window.surface(&event_pump)?;
 

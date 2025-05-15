@@ -1,14 +1,14 @@
-use super::{InitParams, Widget, WidgetData};
+use super::{Widget, WidgetData};
 
 pub struct Div {
 	data: WidgetData,
 }
 
 impl Div {
-	pub fn new(params: &mut InitParams) -> anyhow::Result<Self> {
-		Ok(Self {
-			data: WidgetData::from_params(params)?,
-		})
+	pub fn new() -> anyhow::Result<Box<Self>> {
+		Ok(Box::new(Self {
+			data: WidgetData::new()?,
+		}))
 	}
 }
 

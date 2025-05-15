@@ -1,27 +1,40 @@
-use super::widget::{InitParams, Widget, div::Div};
+use super::widget::{Widget, div::Div};
 use crate::gen_id;
-use taffy::TaffyTree;
+use taffy::{TaffyTree, prelude::length};
 
 pub type BoxedWidget = Box<dyn Widget>;
 gen_id!(WidgetVec, BoxedWidget, WidgetCell, WidgetHandle);
 
 pub struct Layout {
-	pub tree: TaffyTree<()>,
+	pub tree: TaffyTree<WidgetHandle>,
 	pub widgets: WidgetVec,
 	pub root: WidgetHandle,
 }
 
-fn add_child(
+fn add_child_internal(
+	tree: &mut taffy::TaffyTree<WidgetHandle>,
 	vec: &mut WidgetVec,
 	parent_widget: Option<WidgetHandle>,
+	parent_node: Option<taffy::NodeId>,
 	child: BoxedWidget,
-) -> WidgetHandle {
-	let child_handle = vec.add_with_post(child, |_, child| {
+	style: taffy::Style,
+) -> anyhow::Result<WidgetHandle> {
+	let child_node = tree.new_leaf(style)?;
+	if let Some(parent_node) = parent_node {
+		tree.add_child(parent_node, child_node)?;
+	}
+
+	let child_handle = vec.add_with_post(child, |child_handle, child| {
 		let child_data = child.data_mut();
+		child_data.node = child_node;
 
 		if let Some(parent_widget) = parent_widget {
 			child_data.parent = parent_widget;
 		}
+
+		tree
+			.set_node_context(child_node, Some(child_handle))
+			.unwrap();
 	});
 
 	if let Some(parent_widget) = parent_widget {
@@ -32,22 +45,32 @@ fn add_child(
 		parent_widget.data_mut().children.push(child_handle);
 	}
 
-	child_handle
+	Ok(child_handle)
 }
 
 impl Layout {
-	pub fn init_params(&mut self) -> InitParams {
-		InitParams {
-			tree: &mut self.tree,
-		}
-	}
-
 	pub fn add_child(
 		&mut self,
-		parent_widget: Option<WidgetHandle>,
+		parent_widget_handle: WidgetHandle,
 		widget: BoxedWidget,
-	) -> WidgetHandle {
-		add_child(&mut self.widgets, parent_widget, widget)
+		style: taffy::Style,
+	) -> anyhow::Result<WidgetHandle> {
+		let Some(parent_widget) = self.widgets.get(&parent_widget_handle) else {
+			anyhow::bail!("invalid parent widget");
+		};
+
+		let parent_node = parent_widget.data().node;
+
+		let handle = add_child_internal(
+			&mut self.tree,
+			&mut self.widgets,
+			Some(parent_widget_handle),
+			Some(parent_node),
+			widget,
+			style,
+		)?;
+
+		Ok(handle)
 	}
 }
 
@@ -56,11 +79,20 @@ impl Layout {
 		let mut tree = TaffyTree::new();
 		let mut widgets = WidgetVec::new();
 
-		let root = add_child(
+		let root = add_child_internal(
+			&mut tree,
 			&mut widgets,
-			None, /* no parent because it's root */
-			Box::new(Div::new(&mut InitParams { tree: &mut tree })?),
-		);
+			None, /* no parent widget */
+			None, /* no parent node */
+			Div::new()?,
+			taffy::Style {
+				size: taffy::Size {
+					width: length(800.0),
+					height: length(600.0),
+				},
+				..Default::default()
+			},
+		)?;
 
 		Ok(Self {
 			tree,

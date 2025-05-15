@@ -1,5 +1,7 @@
 use taffy::Style;
 
+use crate::layout::Layout;
+
 use super::{
 	drawing::{self, RenderPrimitive},
 	layout::WidgetHandle,
@@ -15,37 +17,20 @@ pub struct WidgetData {
 }
 
 impl WidgetData {
-	fn boundary(&self) -> drawing::Boundary {
-		// Todo
-		drawing::Boundary {
-			x: 0.0,
-			y: 0.0,
-			w: 128.0,
-			h: 32.0,
-		}
-	}
-
-	fn from_params(params: &mut InitParams) -> anyhow::Result<WidgetData> {
-		let node = params.tree.new_leaf(Style {
-			..Default::default()
-		})?;
-
+	fn new() -> anyhow::Result<WidgetData> {
 		Ok(Self {
 			children: Vec::new(),
 			parent: WidgetHandle {
 				idx: 0,
 				generation: u64::MAX, // Unset by default
 			},
-			node,
+			node: taffy::NodeId::new(0), // Unset by default
 		})
 	}
 }
 
-pub struct InitParams<'a> {
-	pub tree: &'a mut taffy::TaffyTree<()>,
-}
-
 pub struct DrawParams<'a> {
+	pub layout: &'a Layout,
 	pub primitives: &'a mut Vec<RenderPrimitive>,
 }
 

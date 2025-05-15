@@ -1,6 +1,6 @@
 use crate::drawing;
 
-use super::{InitParams, Widget, WidgetData};
+use super::{Widget, WidgetData};
 
 pub struct RectangleParams {
 	pub color: drawing::Color,
@@ -12,11 +12,11 @@ pub struct Rectangle {
 }
 
 impl Rectangle {
-	pub fn new(mut init_params: InitParams, params: RectangleParams) -> anyhow::Result<Self> {
-		Ok(Self {
-			data: WidgetData::from_params(&mut init_params)?,
+	pub fn new(params: RectangleParams) -> anyhow::Result<Box<Self>> {
+		Ok(Box::new(Self {
+			data: WidgetData::new()?,
 			params,
-		})
+		}))
 	}
 }
 
@@ -30,8 +30,13 @@ impl Widget for Rectangle {
 	}
 
 	fn draw(&self, params: &mut super::DrawParams) {
+		let Ok(l) = params.layout.tree.layout(self.data.node) else {
+			debug_assert!(false);
+			return;
+		};
+
 		params.primitives.push(drawing::RenderPrimitive::Rectangle(
-			self.data.boundary(),
+			drawing::Boundary::from_taffy(l),
 			drawing::Rectangle {
 				color: self.params.color,
 				round_radius: 0.0,
