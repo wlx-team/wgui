@@ -5,7 +5,7 @@ use vulkano::{
 	descriptor_set::DescriptorSet,
 };
 
-use super::common::CommonResources;
+use super::text_atlas::TextResources;
 
 /// Controls the visible area of all text for a given renderer. Any text outside of the visible
 /// area will be clipped.
@@ -14,7 +14,6 @@ use super::common::CommonResources;
 /// `Viewport`s if you want to render text to specific areas within a window (without having to)
 /// bound each `TextArea`).
 pub struct Viewport {
-	cache: CommonResources,
 	params: Params,
 	params_buffer: Subbuffer<[Params]>,
 	pub params_descriptor: Arc<DescriptorSet>,
@@ -22,20 +21,19 @@ pub struct Viewport {
 
 impl Viewport {
 	/// Creates a new `Viewport` with the given `device` and `cache`.
-	pub fn new(cache: &CommonResources) -> anyhow::Result<Self> {
+	pub fn new(common: TextResources) -> anyhow::Result<Self> {
 		let params = Params {
 			screen_resolution: [0, 0],
 		};
 
-		let params_buffer = cache.gfx.new_buffer(
+		let params_buffer = common.gfx.new_buffer(
 			BufferUsage::UNIFORM_BUFFER | BufferUsage::TRANSFER_DST,
 			[params].iter(),
 		)?;
 
-		let params_descriptor = cache.pipeline.uniform_buffer(1, 0, params_buffer.clone())?;
+		let params_descriptor = common.pipeline.uniform_buffer(2, params_buffer.clone())?;
 
 		Ok(Self {
-			cache: cache.clone(),
 			params,
 			params_buffer,
 			params_descriptor,
@@ -61,5 +59,5 @@ impl Viewport {
 #[repr(C)]
 #[derive(BufferContents, Clone, Copy, Debug, Eq, PartialEq)]
 pub(crate) struct Params {
-	screen_resolution: [u32; 2],
+	pub screen_resolution: [u32; 2],
 }

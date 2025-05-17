@@ -1,22 +1,14 @@
 use crate::{
 	drawing::{self},
-	text::{RenderableText, TextStyle},
+	renderers::text::{RenderableText, TextStyle},
 };
 
 use super::{Widget, WidgetData};
 
+#[derive(Default)]
 pub struct TextParams {
 	pub content: String,
 	pub style: TextStyle,
-}
-
-impl Default for TextParams {
-	fn default() -> Self {
-		Self {
-			content: Default::default(),
-			style: Default::default(),
-		}
-	}
 }
 
 pub struct TextLabel {

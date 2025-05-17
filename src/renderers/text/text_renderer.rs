@@ -2,10 +2,9 @@ use crate::wgfx::GfxCommandBuffer;
 
 use super::{
 	ContentType, FontSystem, GlyphDetails, GpuCacheStatus, SwashCache, TextArea,
-	common::{CommonResources, GlyphVertex},
 	custom_glyph::{CustomGlyphCacheKey, RasterizeCustomGlyphRequest, RasterizedCustomGlyph},
 	error::PrepareStatus,
-	text_atlas::{ColorMode, TextAtlas},
+	text_atlas::{ColorMode, GlyphVertex, TextAtlas, TextResources},
 	viewport::Viewport,
 };
 use cosmic_text::{Color, SubpixelBin, SwashContent};
@@ -16,7 +15,7 @@ use vulkano::{
 
 /// A text renderer that uses cached glyphs to render text into an existing render pass.
 pub struct TextRenderer {
-	common: CommonResources,
+	common: TextResources,
 	vertex_buffer: Subbuffer<[GlyphVertex]>,
 	vertex_buffer_capacity: usize,
 	glyph_vertices: Vec<GlyphVertex>,
@@ -283,7 +282,7 @@ impl TextRenderer {
 			)?;
 			self.vertex_buffer_capacity = new_capacity;
 		}
-		self.vertex_buffer.write()?.clone_from_slice(vertices);
+		self.vertex_buffer.write()?[..vertices.len()].clone_from_slice(vertices);
 
 		Ok(())
 	}
@@ -305,8 +304,10 @@ impl TextRenderer {
 			viewport.params_descriptor.clone(),
 		];
 
+		let res = viewport.resolution();
+
 		let pass = self.common.pipeline.create_pass_vertices(
-			[0., 0.],
+			[res[0] as _, res[1] as _],
 			self.vertex_buffer.clone(),
 			0..4,
 			0..self.glyph_vertices.len() as u32,
@@ -412,7 +413,7 @@ where
 				Some([image.width as _, image.height as _, 1]),
 			)?;
 
-			cmd_buf.build_and_execute_now()?; //TODO: remove needless fence wait
+			cmd_buf.build_and_execute_now()?; //TODO: do not wait for fence here
 
 			(
 				GpuCacheStatus::InAtlas {
@@ -495,9 +496,9 @@ where
 
 	Ok(Some(GlyphVertex {
 		in_pos: [x, y],
-		dim: [width as u16, height as u16],
-		uv: [atlas_x, atlas_y],
-		color: color.0,
+		in_dim: [width as u16, height as u16],
+		in_uv: [atlas_x, atlas_y],
+		in_color: color.0,
 		content_type_with_srgb: [
 			content_type as u16,
 			match atlas.color_mode {

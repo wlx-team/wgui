@@ -6,7 +6,7 @@ use taffy::{
 use crate::{
 	drawing::{self, Color},
 	layout::{Layout, WidgetID},
-	text::{FontWeight, TextStyle},
+	renderers::text::{FontWeight, TextStyle},
 	widget::{
 		rectangle::{Rectangle, RectangleParams},
 		text::{TextLabel, TextParams},
@@ -35,9 +35,7 @@ pub fn construct(layout: &mut Layout, parent: WidgetID, params: Params) -> anyho
 	// simulate a border because we don't have it yet
 	let outer_border = layout.add_child(
 		parent,
-		Rectangle::new(RectangleParams {
-			color: Color([0.0, 0.0, 0.0, 1.0]),
-		})?,
+		Rectangle::new(RectangleParams::default())?,
 		taffy::Style {
 			size: taffy::Size {
 				width: length(128.0),
@@ -52,6 +50,7 @@ pub fn construct(layout: &mut Layout, parent: WidgetID, params: Params) -> anyho
 		outer_border,
 		Rectangle::new(RectangleParams {
 			color: params.color,
+			..Default::default()
 		})?,
 		taffy::Style {
 			size: taffy::Size {

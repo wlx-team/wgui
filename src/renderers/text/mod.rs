@@ -1,10 +1,9 @@
-mod common;
 mod custom_glyph;
 mod error;
-mod shaders;
-mod text_atlas;
-mod text_renderer;
-mod viewport;
+pub mod shaders;
+pub mod text_atlas;
+pub mod text_renderer;
+pub mod viewport;
 
 use std::sync::{LazyLock, Mutex};
 
@@ -18,9 +17,9 @@ use taffy::AvailableSpace;
 
 use crate::drawing::{self, Boundary};
 
-pub(super) static FONT_SYSTEM: LazyLock<Mutex<FontSystem>> =
+pub static FONT_SYSTEM: LazyLock<Mutex<FontSystem>> =
 	LazyLock::new(|| Mutex::new(FontSystem::new()));
-pub(super) static SWASH_CACHE: LazyLock<Mutex<SwashCache>> =
+pub static SWASH_CACHE: LazyLock<Mutex<SwashCache>> =
 	LazyLock::new(|| Mutex::new(SwashCache::new()));
 
 /// Used in case no font_size is defined
@@ -57,6 +56,10 @@ impl RenderableText {
 		}
 
 		Self { buffer }
+	}
+
+	pub fn get_buffer(&self) -> &Buffer {
+		&self.buffer
 	}
 
 	pub fn measure(

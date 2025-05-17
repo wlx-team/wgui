@@ -1,19 +1,15 @@
 use taffy::Size;
 
-use crate::drawing;
+use crate::drawing::{self, GradientMode};
 
 use super::{Widget, WidgetData};
 
+#[derive(Default)]
 pub struct RectangleParams {
 	pub color: drawing::Color,
-}
-
-impl Default for RectangleParams {
-	fn default() -> Self {
-		Self {
-			color: drawing::Color([0.0, 0.0, 0.0, 1.0]),
-		}
-	}
+	pub color2: drawing::Color,
+	pub gradient: GradientMode,
+	pub radius: f32,
 }
 
 pub struct Rectangle {
@@ -53,7 +49,9 @@ impl Widget for Rectangle {
 			drawing::Boundary::construct(params.transform_stack),
 			drawing::Rectangle {
 				color,
-				round_radius: 0.0,
+				color2: self.params.color2,
+				gradient: self.params.gradient,
+				round_radius: self.params.radius,
 			},
 		));
 	}

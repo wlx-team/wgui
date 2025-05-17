@@ -5,27 +5,69 @@ use rustc_hash::FxHasher;
 use std::{collections::HashSet, hash::BuildHasherDefault, sync::Arc};
 use vulkano::{
 	DeviceSize,
-	buffer::{Buffer, BufferCreateInfo, BufferUsage, Subbuffer},
+	buffer::{Buffer, BufferContents, BufferCreateInfo, BufferUsage, Subbuffer},
 	command_buffer::CommandBufferUsage,
 	descriptor_set::DescriptorSet,
 	format::Format,
 	image::{Image, ImageCreateInfo, ImageType, ImageUsage, sampler::Filter, view::ImageView},
 	memory::allocator::{AllocationCreateInfo, MemoryTypeFilter},
+	pipeline::graphics::{input_assembly::PrimitiveTopology, vertex_input::Vertex},
 };
-
-use crate::text::GpuCacheStatus;
 
 use super::{
-	GlyphDetails,
-	common::CommonResources,
+	GlyphDetails, GpuCacheStatus,
 	custom_glyph::{ContentType, RasterizeCustomGlyphRequest, RasterizedCustomGlyph},
+	shaders::{frag_atlas, vert_atlas},
 	text_renderer::GlyphonCacheKey,
 };
+use crate::wgfx::{BLEND_ALPHA, WGfx, WGfxPipeline};
+
+/// A cache to share common resources between multiple text renderers.
+#[derive(Clone)]
+pub struct TextResources {
+	pub gfx: Arc<WGfx>,
+	pub pipeline: Arc<WGfxPipeline<GlyphVertex>>,
+}
+
+impl TextResources {
+	pub fn new(gfx: Arc<WGfx>, format: Format) -> anyhow::Result<Self> {
+		let vert = vert_atlas::load(gfx.device.clone())?;
+		let frag = frag_atlas::load(gfx.device.clone())?;
+
+		let pipeline = gfx.create_pipeline::<GlyphVertex>(
+			vert,
+			frag,
+			format,
+			Some(BLEND_ALPHA),
+			PrimitiveTopology::TriangleStrip,
+			true,
+		)?;
+
+		Ok(Self { gfx, pipeline })
+	}
+}
+
+#[repr(C)]
+#[derive(BufferContents, Vertex, Copy, Clone, Debug, Default)]
+pub struct GlyphVertex {
+	#[format(R32G32_SINT)]
+	pub in_pos: [i32; 2],
+	#[format(R32_UINT)]
+	pub in_dim: [u16; 2],
+	#[format(R32_UINT)]
+	pub in_uv: [u16; 2],
+	#[format(R32_UINT)]
+	pub in_color: u32,
+	#[format(R32_UINT)]
+	pub content_type_with_srgb: [u16; 2],
+	#[format(R32_SFLOAT)]
+	pub depth: f32,
+}
 
 type Hasher = BuildHasherDefault<FxHasher>;
 
 #[allow(dead_code)]
-pub(crate) struct InnerAtlas {
+pub struct InnerAtlas {
 	pub kind: Kind,
 	pub image_view: Arc<ImageView>,
 	pub image_descriptor: Arc<DescriptorSet>,
@@ -34,13 +76,13 @@ pub(crate) struct InnerAtlas {
 	pub glyph_cache: LruCache<GlyphonCacheKey, GlyphDetails, Hasher>,
 	pub glyphs_in_use: HashSet<GlyphonCacheKey, Hasher>,
 	pub max_texture_dimension_2d: u32,
-	common: CommonResources,
+	common: TextResources,
 }
 
 impl InnerAtlas {
 	const INITIAL_SIZE: u32 = 256;
 
-	fn new(common: CommonResources, kind: Kind) -> anyhow::Result<Self> {
+	fn new(common: TextResources, kind: Kind) -> anyhow::Result<Self> {
 		let max_texture_dimension_2d = common
 			.gfx
 			.device
@@ -67,8 +109,7 @@ impl InnerAtlas {
 		let image_view = ImageView::new_default(image).unwrap();
 
 		let image_descriptor = common.pipeline.uniform_sampler(
-			0,
-			Self::binding(kind),
+			Self::descriptor_set(kind),
 			image_view.clone(),
 			Filter::Nearest,
 		)?;
@@ -89,7 +130,7 @@ impl InnerAtlas {
 		})
 	}
 
-	fn binding(kind: Kind) -> u32 {
+	fn descriptor_set(kind: Kind) -> usize {
 		match kind {
 			Kind::Color { .. } => 0,
 			Kind::Mask => 1,
@@ -156,7 +197,7 @@ impl InnerAtlas {
 		let image = self.common.gfx.new_image(
 			new_size,
 			new_size,
-			self.image_view.format(),
+			self.common.pipeline.format,
 			ImageUsage::SAMPLED | ImageUsage::TRANSFER_DST,
 		)?;
 
@@ -247,8 +288,7 @@ impl InnerAtlas {
 
 	fn rebind_descriptor(&mut self) -> anyhow::Result<()> {
 		self.image_descriptor = self.common.pipeline.uniform_sampler(
-			0,
-			Self::binding(self.kind),
+			Self::descriptor_set(self.kind),
 			self.image_view.clone(),
 			Filter::Nearest,
 		)?;
@@ -316,25 +356,20 @@ pub enum ColorMode {
 
 /// An atlas containing a cache of rasterized glyphs that can be rendered.
 pub struct TextAtlas {
-	pub(super) common: CommonResources,
-	pub(super) color_atlas: InnerAtlas,
-	pub(super) mask_atlas: InnerAtlas,
-	pub(super) format: Format,
+	pub(super) common: TextResources,
+	pub color_atlas: InnerAtlas,
+	pub mask_atlas: InnerAtlas,
 	pub(super) color_mode: ColorMode,
 }
 
 impl TextAtlas {
 	/// Creates a new [`TextAtlas`].
-	pub fn new(cache: &CommonResources, format: Format) -> anyhow::Result<Self> {
-		Self::with_color_mode(cache, format, ColorMode::Accurate)
+	pub fn new(common: TextResources) -> anyhow::Result<Self> {
+		Self::with_color_mode(common, ColorMode::Accurate)
 	}
 
 	/// Creates a new [`TextAtlas`] with the given [`ColorMode`].
-	pub fn with_color_mode(
-		common: &CommonResources,
-		format: Format,
-		color_mode: ColorMode,
-	) -> anyhow::Result<Self> {
+	pub fn with_color_mode(common: TextResources, color_mode: ColorMode) -> anyhow::Result<Self> {
 		let color_atlas = InnerAtlas::new(
 			common.clone(),
 			Kind::Color {
@@ -347,10 +382,9 @@ impl TextAtlas {
 		let mask_atlas = InnerAtlas::new(common.clone(), Kind::Mask)?;
 
 		Ok(Self {
-			common: common.clone(),
+			common,
 			color_atlas,
 			mask_atlas,
-			format,
 			color_mode,
 		})
 	}

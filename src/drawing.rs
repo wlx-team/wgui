@@ -2,7 +2,7 @@ use glam::Vec2;
 
 use crate::{
 	layout::BoxWidget,
-	text::RenderableText,
+	renderers::text::RenderableText,
 	transform_stack::{Transform, TransformStack},
 };
 
@@ -43,9 +43,21 @@ impl Default for Color {
 	}
 }
 
-#[derive(Default)]
+#[repr(u8)]
+#[derive(Default, Clone, Copy)]
+pub enum GradientMode {
+	#[default]
+	None,
+	Horizontal,
+	Vertical,
+}
+
+#[derive(Default, Clone, Copy)]
 pub struct Rectangle {
 	pub color: Color,
+	pub color2: Color,
+	pub gradient: GradientMode,
+
 	pub round_radius: f32, // 0.0 - 1.0
 }
 

@@ -1,25 +1,21 @@
-pub mod vert_atlas {
+pub mod vert_rect {
 	vulkano_shaders::shader! {
 			ty: "vertex",
 			src: r"#version 310 es
             precision highp float;
 
             layout (location = 0) in ivec2 in_pos;
-            layout (location = 1) in uint in_dim;
-            layout (location = 2) in uint in_uv;
+            layout (location = 1) in vec2 in_uv;
+            layout (location = 2) in uint in_dim;
             layout (location = 3) in uint in_color;
-            layout (location = 4) in uint content_type_with_srgb;
-            layout (location = 5) in float depth;
-
+            layout (location = 4) in float corner_radius;
+            layout (location = 5) in uint content_type_with_srgb;
+            layout (location = 6) in float depth;
 
             layout (location = 0) out vec4 out_color;
-            layout (location = 1) out vec2 out_uv;
-            layout (location = 2) flat out uint content_type;
+            layout (location = 1) out vec2 out_radius;
 
-            layout (set = 0, binding = 0) uniform sampler2D color_atlas;
-            layout (set = 0, binding = 1) uniform sampler2D mask_atlas;
-
-            layout (set = 1, binding = 0) uniform UniformParams {
+            layout (set = 2, binding = 0) uniform UniformParams {
                 uniform uvec2 screen_resolution;
             };
 
@@ -32,18 +28,18 @@ pub mod vert_atlas {
 						}
 
             void main() {
+							out_uv = in_uv;
+
 						  ivec2 pos = in_pos;
 							uint width = in_dim & 0xffffu;
 							uint height = (in_dim & 0xffff0000u) >> 16u;
 
-							uvec2 uv = uvec2(in_uv & 0xffffu, (in_uv & 0xffff0000u) >> 16u);
 							uint v = uint(gl_VertexIndex);
 
 							uvec2 corner_position = uvec2(v & 1u, (v >> 1u) & 1u);
 
 							uvec2 corner_offset = uvec2(width, height) * corner_position;
 
-							uv = uv + corner_offset;
 							pos = pos + ivec2(corner_offset);
 
               gl_Position = vec4(
@@ -79,36 +75,34 @@ pub mod vert_atlas {
 							} else {
 							  dim = uvec2(textureSize(mask_atlas, 0));
 							}
-
-							out_uv = vec2(uv) / vec2(dim);
             }
         ",
 	}
 }
 
-pub mod frag_atlas {
+pub mod frag_rect {
 	vulkano_shaders::shader! {
 			ty: "fragment",
 			src: r"#version 310 es
             precision highp float;
 
             layout (location = 0) in vec4 in_color;
-            layout (location = 1) in vec2 in_uv;
-            layout (location = 2) flat in uint content_type;
+            layout (location = 1) in float in_radius;
 
             layout (location = 0) out vec4 out_color;
 
-            layout (set = 0, binding = 0) uniform sampler2D color_atlas;
-            layout (set = 0, binding = 1) uniform sampler2D mask_atlas;
-
             void main()
             {
-						  if (content_type == 0u) {
-							  out_color = texture(color_atlas, in_uv);
-							} else {
-								out_color.rgb = in_color.rgb;
-								out_color.a = in_color.a * texture(mask_atlas, in_uv).r;
-							}
+                out_color.r = corner_radius.r;
+                out_color = in_color;
+
+                vec2 uv_circ = ((1. - corner_radius) - (abs(in_uv + vec2(-0.5)) * 2.))/corner_radius;
+                float dist = length(uv_circ);
+
+                out_color.a = mix(out_color.a, 0.,
+                        float(dist > 1.)
+                        * float(uv_circ.x < 0.)
+                        * float(uv_circ.y < 0.));
             }
         ",
 	}

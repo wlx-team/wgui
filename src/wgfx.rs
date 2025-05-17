@@ -41,7 +41,7 @@ use vulkano::{
 			color_blend::{
 				AttachmentBlend, BlendFactor, BlendOp, ColorBlendAttachmentState, ColorBlendState,
 			},
-			input_assembly::InputAssemblyState,
+			input_assembly::{InputAssemblyState, PrimitiveTopology},
 			multisample::MultisampleState,
 			rasterization::RasterizationState,
 			subpass::PipelineRenderingCreateInfo,
@@ -64,6 +64,18 @@ pub const BLEND_ALPHA: AttachmentBlend = AttachmentBlend {
 	alpha_blend_op: BlendOp::Max,
 };
 
+pub type Vert2Buf = Subbuffer<[Vert2Uv]>;
+pub type IndexBuf = IndexBuffer;
+#[repr(C)]
+#[derive(BufferContents, Vertex, Copy, Clone, Debug)]
+pub struct Vert2Uv {
+	#[format(R32G32_SFLOAT)]
+	pub in_pos: [f32; 2],
+	#[format(R32G32_SFLOAT)]
+	pub in_uv: [f32; 2],
+}
+
+pub const INDICES: [u16; 6] = [2, 1, 0, 1, 2, 3];
 #[derive(Clone)]
 pub struct WGfx {
 	pub instance: Arc<Instance>,
@@ -106,6 +118,44 @@ impl WGfx {
 			command_buffer_allocator,
 			descriptor_set_allocator,
 		})
+	}
+	pub fn upload_verts(
+		&self,
+		width: f32,
+		height: f32,
+		x: f32,
+		y: f32,
+		w: f32,
+		h: f32,
+	) -> anyhow::Result<Vert2Buf> {
+		let rw = width;
+		let rh = height;
+
+		let x0 = x / rw;
+		let y0 = y / rh;
+
+		let x1 = w / rw + x0;
+		let y1 = h / rh + y0;
+
+		let vertices = [
+			Vert2Uv {
+				in_pos: [x0, y0],
+				in_uv: [0.0, 0.0],
+			},
+			Vert2Uv {
+				in_pos: [x0, y1],
+				in_uv: [0.0, 1.0],
+			},
+			Vert2Uv {
+				in_pos: [x1, y0],
+				in_uv: [1.0, 0.0],
+			},
+			Vert2Uv {
+				in_pos: [x1, y1],
+				in_uv: [1.0, 1.0],
+			},
+		];
+		self.new_buffer(BufferUsage::VERTEX_BUFFER, vertices.iter())
 	}
 
 	pub fn empty_buffer<T>(&self, usage: BufferUsage, capacity: u64) -> anyhow::Result<Subbuffer<[T]>>
@@ -174,6 +224,8 @@ impl WGfx {
 		frag: Arc<ShaderModule>,
 		format: Format,
 		blend: Option<AttachmentBlend>,
+		topology: PrimitiveTopology,
+		instanced: bool,
 	) -> anyhow::Result<Arc<WGfxPipeline<V>>>
 	where
 		V: BufferContents + Vertex,
@@ -184,6 +236,8 @@ impl WGfx {
 			frag,
 			format,
 			blend,
+			topology,
+			instanced,
 		)?))
 	}
 
@@ -379,11 +433,17 @@ where
 		frag: Arc<ShaderModule>,
 		format: Format,
 		blend: Option<AttachmentBlend>,
+		topology: PrimitiveTopology,
+		instanced: bool,
 	) -> anyhow::Result<Self> {
 		let vep = vert.entry_point("main").unwrap(); // want panic
 		let fep = frag.entry_point("main").unwrap(); // want panic
 
-		let vertex_input_state = V::per_vertex().definition(&vep)?;
+		let vertex_input_state = if instanced {
+			V::per_instance().definition(&vep)?
+		} else {
+			V::per_vertex().definition(&vep)?
+		};
 
 		let stages = smallvec![
 			vulkano::pipeline::PipelineShaderStageCreateInfo::new(vep),
@@ -407,9 +467,15 @@ where
 			GraphicsPipelineCreateInfo {
 				stages,
 				vertex_input_state: Some(vertex_input_state),
-				input_assembly_state: Some(InputAssemblyState::default()),
+				input_assembly_state: Some(InputAssemblyState {
+					topology,
+					..InputAssemblyState::default()
+				}),
 				viewport_state: Some(ViewportState::default()),
-				rasterization_state: Some(RasterizationState::default()),
+				rasterization_state: Some(RasterizationState {
+					cull_mode: vulkano::pipeline::graphics::rasterization::CullMode::None,
+					..RasterizationState::default()
+				}),
 				multisample_state: Some(MultisampleState::default()),
 				color_blend_state: Some(ColorBlendState {
 					attachments: vec![ColorBlendAttachmentState {
@@ -473,7 +539,6 @@ where
 	pub fn uniform_sampler(
 		&self,
 		set: usize,
-		binding: u32,
 		texture: Arc<ImageView>,
 		filter: Filter,
 	) -> anyhow::Result<Arc<DescriptorSet>> {
@@ -492,9 +557,7 @@ where
 		Ok(DescriptorSet::new(
 			self.graphics.descriptor_set_allocator.clone(),
 			layout.clone(),
-			[WriteDescriptorSet::image_view_sampler(
-				binding, texture, sampler,
-			)],
+			[WriteDescriptorSet::image_view_sampler(0, texture, sampler)],
 			[],
 		)?)
 	}
@@ -502,7 +565,6 @@ where
 	pub fn uniform_buffer<T>(
 		&self,
 		set: usize,
-		binding: u32,
 		buffer: Subbuffer<[T]>,
 	) -> anyhow::Result<Arc<DescriptorSet>>
 	where
@@ -512,7 +574,7 @@ where
 		Ok(DescriptorSet::new(
 			self.graphics.descriptor_set_allocator.clone(),
 			layout.clone(),
-			[WriteDescriptorSet::buffer(binding, buffer)],
+			[WriteDescriptorSet::buffer(0, buffer)],
 			[],
 		)?)
 	}
@@ -520,7 +582,6 @@ where
 	pub fn uniform_buffer_upload<T>(
 		&self,
 		set: usize,
-		binding: u32,
 		data: Vec<T>,
 	) -> anyhow::Result<Arc<DescriptorSet>>
 	where
@@ -542,7 +603,7 @@ where
 			subbuffer
 		};
 
-		self.uniform_buffer(set, binding, uniform_buffer_subbuffer)
+		self.uniform_buffer(set, uniform_buffer_subbuffer)
 	}
 }
 
@@ -650,7 +711,7 @@ where
 				)?
 				.bind_vertex_buffers(0, vertex_buffer)?
 				.draw(
-					vertices.end - vertices.start,
+					vertices.end - vertices.start, //TODO: verify
 					instances.end - instances.start,
 					vertices.start,
 					instances.start,

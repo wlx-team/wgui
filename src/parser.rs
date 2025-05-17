@@ -3,9 +3,9 @@ use std::collections::HashMap;
 use taffy::{AlignContent, AlignItems, BoxSizing, FlexDirection, FlexWrap, JustifyContent};
 
 use crate::{
-	drawing::{self},
+	drawing::{self, GradientMode},
 	layout::{Layout, WidgetID},
-	text::{FontWeight, HorizontalAlign},
+	renderers::text::{FontWeight, HorizontalAlign},
 	widget::{
 		div::Div,
 		rectangle::{Rectangle, RectangleParams},
@@ -296,7 +296,33 @@ fn parse_widget_rectangle<'a>(
 			"color" => {
 				if let Some(color) = parse_color(value) {
 					params.color = color;
+				} else {
+					print_invalid_attrib(key, value);
 				}
+			}
+			"color2" => {
+				if let Some(color) = parse_color(value) {
+					params.color2 = color;
+				} else {
+					print_invalid_attrib(key, value);
+				}
+			}
+			"gradient" => {
+				params.gradient = match value {
+					"horizontal" => GradientMode::Horizontal,
+					"vertical" => GradientMode::Vertical,
+					"none" => GradientMode::None,
+					_ => {
+						print_invalid_attrib(key, value);
+						GradientMode::None
+					}
+				}
+			}
+			"radius" => {
+				params.radius = value.parse().unwrap_or_else(|_| {
+					print_invalid_attrib(key, value);
+					0.0
+				});
 			}
 			_ => {}
 		}
