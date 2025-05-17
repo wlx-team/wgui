@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use taffy::{AlignContent, AlignItems, BoxSizing, FlexDirection, FlexWrap, JustifyContent};
 
 use crate::{
@@ -11,8 +13,23 @@ use crate::{
 	},
 };
 
+#[derive(Default)]
+pub struct ParserResult {
+	pub ids: HashMap<String, WidgetID>,
+}
+
+impl ParserResult {
+	pub fn require_by_id(&self, id: &str) -> anyhow::Result<WidgetID> {
+		match self.ids.get(id) {
+			Some(id) => Ok(*id),
+			None => anyhow::bail!("Widget by ID \"{}\" doesn't exist", id),
+		}
+	}
+}
+
 struct ParserContext<'a> {
 	layout: &'a mut Layout,
+	result: &'a mut ParserResult,
 }
 
 // Parses a color from a HTML hex string
@@ -258,6 +275,7 @@ fn parse_widget_div<'a>(
 		.layout
 		.add_child(parent_id, Div::new()?, style_from_node(node))?;
 
+	parse_universal(ctx, node, new_widget_id)?;
 	parse_children(ctx, node, new_widget_id)?;
 
 	Ok(())
@@ -289,6 +307,7 @@ fn parse_widget_rectangle<'a>(
 			.layout
 			.add_child(parent_id, Rectangle::new(params)?, style_from_node(node))?;
 
+	parse_universal(ctx, node, new_widget_id)?;
 	parse_children(ctx, node, new_widget_id)?;
 
 	Ok(())
@@ -347,8 +366,36 @@ fn parse_widget_label<'a>(
 			.layout
 			.add_child(parent_id, TextLabel::new(params)?, style_from_node(node))?;
 
+	parse_universal(ctx, node, new_widget_id)?;
 	parse_children(ctx, node, new_widget_id)?;
 
+	Ok(())
+}
+
+fn parse_universal<'a>(
+	ctx: &mut ParserContext,
+	node: roxmltree::Node<'a, 'a>,
+	widget_id: WidgetID,
+) -> anyhow::Result<()> {
+	for attrib in node.attributes() {
+		let (key, value) = (attrib.name(), attrib.value());
+
+		#[allow(clippy::single_match)]
+		match key {
+			"id" => {
+				// Attach a specific widget to name-ID map (just like getElementById)
+				if ctx
+					.result
+					.ids
+					.insert(String::from(value), widget_id)
+					.is_some()
+				{
+					log::warn!("duplicate ID \"{}\" in the same layout file!", value);
+				}
+			}
+			_ => {}
+		}
+	}
 	Ok(())
 }
 
@@ -374,8 +421,13 @@ fn parse_children<'a>(
 	Ok(())
 }
 
-pub fn parse(layout: &mut Layout, parent_id: WidgetID, xml: &str) -> anyhow::Result<()> {
-	let mut ctx = ParserContext { layout };
+pub fn parse(layout: &mut Layout, parent_id: WidgetID, xml: &str) -> anyhow::Result<ParserResult> {
+	let mut result = ParserResult::default();
+
+	let mut ctx = ParserContext {
+		layout,
+		result: &mut result,
+	};
 
 	let opt = roxmltree::ParsingOptions {
 		allow_dtd: true,
@@ -389,5 +441,5 @@ pub fn parse(layout: &mut Layout, parent_id: WidgetID, xml: &str) -> anyhow::Res
 
 	parse_children(&mut ctx, tag_elements, parent_id)?;
 
-	Ok(())
+	Ok(result)
 }

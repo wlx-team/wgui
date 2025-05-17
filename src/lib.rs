@@ -1,4 +1,6 @@
+pub mod components;
 pub mod drawing;
+pub mod event;
 pub mod layout;
 pub mod parser;
 pub mod text;

@@ -19,11 +19,23 @@ impl Testbed {
 	pub fn new() -> anyhow::Result<Self> {
 		let mut layout = Layout::new()?;
 
+		use wgui::components::button;
 		let parent = layout.root;
-		wgui::parser::parse(
+
+		let res = wgui::parser::parse(
 			&mut layout,
 			parent,
 			std::fs::read_to_string("res/testbed.xml").unwrap().as_str(),
+		)?;
+
+		let my_div_parent = res.require_by_id("my_div_parent")?;
+
+		button::construct(
+			&mut layout,
+			my_div_parent,
+			button::Params {
+				text: "I'm a button!",
+			},
 		)?;
 
 		Ok(Self { layout })
