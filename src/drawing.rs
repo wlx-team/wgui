@@ -66,8 +66,8 @@ fn draw_children(layout: &Layout, params: &mut DrawParams, widget: &BoxWidget) {
 	};
 
 	params.transform_stack.push(Transform {
-		pos: Vec2::new(l.content_box_x(), l.content_box_y()),
-		dim: Vec2::new(l.content_box_width(), l.content_box_height()),
+		pos: Vec2::new(l.location.x, l.location.y),
+		dim: Vec2::new(l.size.width, l.size.height),
 	});
 
 	widget.draw(params);
