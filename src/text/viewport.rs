@@ -1,7 +1,11 @@
-use vulkano::buffer::Subbuffer;
+use std::sync::Arc;
 
-use super::{Params, Resolution, cache::Cache};
-use std::{mem, slice};
+use vulkano::{
+	buffer::{BufferContents, BufferUsage, Subbuffer},
+	descriptor_set::DescriptorSet,
+};
+
+use super::common::CommonResources;
 
 /// Controls the visible area of all text for a given renderer. Any text outside of the visible
 /// area will be clipped.
@@ -9,45 +13,53 @@ use std::{mem, slice};
 /// Many projects will only ever need a single `Viewport`, but it is possible to create multiple
 /// `Viewport`s if you want to render text to specific areas within a window (without having to)
 /// bound each `TextArea`).
-#[derive(Debug)]
 pub struct Viewport {
+	cache: CommonResources,
 	params: Params,
-	params_buffer: Option<Subbuffer<u8>>,
+	params_buffer: Subbuffer<[Params]>,
+	pub params_descriptor: Arc<DescriptorSet>,
 }
 
 impl Viewport {
 	/// Creates a new `Viewport` with the given `device` and `cache`.
-	pub fn new(cache: &Cache) -> Self {
+	pub fn new(cache: &CommonResources) -> anyhow::Result<Self> {
 		let params = Params {
-			screen_resolution: Resolution {
-				width: 0,
-				height: 0,
-			},
-			_pad: [0, 0],
+			screen_resolution: [0, 0],
 		};
 
-		Self {
+		let params_buffer = cache.gfx.new_buffer(
+			BufferUsage::UNIFORM_BUFFER | BufferUsage::TRANSFER_DST,
+			[params].iter(),
+		)?;
+
+		let params_descriptor = cache.pipeline.uniform_buffer(1, 0, params_buffer.clone())?;
+
+		Ok(Self {
+			cache: cache.clone(),
 			params,
-			params_buffer: None,
-		}
+			params_buffer,
+			params_descriptor,
+		})
 	}
 
 	/// Updates the `Viewport` with the given `resolution`.
-	pub fn update(&mut self, queue: &Queue, resolution: Resolution) {
+	pub fn update(&mut self, resolution: [u32; 2]) -> anyhow::Result<()> {
 		if self.params.screen_resolution != resolution {
 			self.params.screen_resolution = resolution;
 
-			queue.write_buffer(&self.params_buffer, 0, unsafe {
-				slice::from_raw_parts(
-					&self.params as *const Params as *const u8,
-					mem::size_of::<Params>(),
-				)
-			});
+			self.params_buffer.write()?.copy_from_slice(&[self.params]);
 		}
+		Ok(())
 	}
 
 	/// Returns the current resolution of the `Viewport`.
-	pub fn resolution(&self) -> Resolution {
+	pub fn resolution(&self) -> [u32; 2] {
 		self.params.screen_resolution
 	}
+}
+
+#[repr(C)]
+#[derive(BufferContents, Clone, Copy, Debug, Eq, PartialEq)]
+pub(crate) struct Params {
+	screen_resolution: [u32; 2],
 }

@@ -5,17 +5,17 @@ use std::{
 
 /// An error that occurred while preparing text for rendering.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub enum PrepareError {
+pub enum PrepareStatus {
 	AtlasFull,
 }
 
-impl Display for PrepareError {
+impl Display for PrepareStatus {
 	fn fmt(&self, f: &mut Formatter) -> fmt::Result {
 		write!(f, "Prepare error: glyph texture atlas is full")
 	}
 }
 
-impl Error for PrepareError {}
+impl Error for PrepareStatus {}
 
 /// An error that occurred while rendering text.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]

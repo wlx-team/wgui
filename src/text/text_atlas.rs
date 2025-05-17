@@ -7,21 +7,17 @@ use vulkano::{
 	DeviceSize,
 	buffer::{Buffer, BufferCreateInfo, BufferUsage, Subbuffer},
 	command_buffer::CommandBufferUsage,
-	device::{Device, Queue},
+	descriptor_set::DescriptorSet,
 	format::Format,
-	image::{Image, ImageCreateInfo, ImageType, ImageUsage, view::ImageView},
+	image::{Image, ImageCreateInfo, ImageType, ImageUsage, sampler::Filter, view::ImageView},
 	memory::allocator::{AllocationCreateInfo, MemoryTypeFilter},
-	pipeline::{
-		GraphicsPipeline,
-		graphics::{depth_stencil::DepthStencilState, multisample::MultisampleState},
-	},
 };
 
-use crate::{text::GpuCacheStatus, wgfx::WGfx};
+use crate::text::GpuCacheStatus;
 
 use super::{
 	GlyphDetails,
-	cache::Cache,
+	common::CommonResources,
 	custom_glyph::{ContentType, RasterizeCustomGlyphRequest, RasterizedCustomGlyph},
 	text_renderer::GlyphonCacheKey,
 };
@@ -32,19 +28,21 @@ type Hasher = BuildHasherDefault<FxHasher>;
 pub(crate) struct InnerAtlas {
 	pub kind: Kind,
 	pub image_view: Arc<ImageView>,
+	pub image_descriptor: Arc<DescriptorSet>,
 	pub packer: BucketedAtlasAllocator,
 	pub size: u32,
 	pub glyph_cache: LruCache<GlyphonCacheKey, GlyphDetails, Hasher>,
 	pub glyphs_in_use: HashSet<GlyphonCacheKey, Hasher>,
 	pub max_texture_dimension_2d: u32,
-	gfx: Arc<WGfx>,
+	common: CommonResources,
 }
 
 impl InnerAtlas {
 	const INITIAL_SIZE: u32 = 256;
 
-	fn new(gfx: Arc<WGfx>, kind: Kind) -> Self {
-		let max_texture_dimension_2d = gfx
+	fn new(common: CommonResources, kind: Kind) -> anyhow::Result<Self> {
+		let max_texture_dimension_2d = common
+			.gfx
 			.device
 			.physical_device()
 			.properties()
@@ -55,7 +53,7 @@ impl InnerAtlas {
 
 		// Create a texture to use for our atlas
 		let image = Image::new(
-			gfx.memory_allocator.clone(),
+			common.gfx.memory_allocator.clone(),
 			ImageCreateInfo {
 				image_type: ImageType::Dim2d,
 				format: kind.texture_format(),
@@ -64,23 +62,37 @@ impl InnerAtlas {
 				..Default::default()
 			},
 			AllocationCreateInfo::default(),
-		)
-		.unwrap();
+		)?;
 
 		let image_view = ImageView::new_default(image).unwrap();
+
+		let image_descriptor = common.pipeline.uniform_sampler(
+			0,
+			Self::binding(kind),
+			image_view.clone(),
+			Filter::Nearest,
+		)?;
 
 		let glyph_cache = LruCache::unbounded_with_hasher(Hasher::default());
 		let glyphs_in_use = HashSet::with_hasher(Hasher::default());
 
-		Self {
+		Ok(Self {
 			kind,
 			image_view,
+			image_descriptor,
 			packer,
 			size,
 			glyph_cache,
 			glyphs_in_use,
 			max_texture_dimension_2d,
-			gfx,
+			common,
+		})
+	}
+
+	fn binding(kind: Kind) -> u32 {
+		match kind {
+			Kind::Color { .. } => 0,
+			Kind::Mask => 1,
 		}
 	}
 
@@ -141,21 +153,19 @@ impl InnerAtlas {
 
 		self.packer.grow(size2(new_size as i32, new_size as i32));
 
-		// Create a texture to use for our atlas
-		let image = Image::new(
-			self.gfx.memory_allocator.clone(),
-			ImageCreateInfo {
-				image_type: ImageType::Dim2d,
-				format: self.image_view.format(),
-				extent: [new_size, new_size, 1],
-				usage: ImageUsage::SAMPLED | ImageUsage::TRANSFER_DST,
-				..Default::default()
-			},
-			AllocationCreateInfo::default(),
-		)
-		.unwrap();
+		let image = self.common.gfx.new_image(
+			new_size,
+			new_size,
+			self.image_view.format(),
+			ImageUsage::SAMPLED | ImageUsage::TRANSFER_DST,
+		)?;
 
-		self.image_view = ImageView::new_default(image).unwrap();
+		self.image_view = ImageView::new_default(image.clone()).unwrap();
+
+		let mut cmd_buf = self
+			.common
+			.gfx
+			.create_xfer_command_buffer(CommandBufferUsage::OneTimeSubmit)?;
 
 		// Re-upload glyphs
 		for (&cache_key, glyph) in &self.glyph_cache {
@@ -201,7 +211,7 @@ impl InnerAtlas {
 			};
 
 			let buffer: Subbuffer<[u8]> = Buffer::new_slice(
-				self.gfx.memory_allocator.clone(),
+				self.common.gfx.memory_allocator.clone(),
 				BufferCreateInfo {
 					usage: BufferUsage::TRANSFER_SRC,
 					..Default::default()
@@ -217,12 +227,14 @@ impl InnerAtlas {
 
 			buffer.write().unwrap().copy_from_slice(&image_data);
 
-			let mut cmd_buf = self
-				.gfx
-				.create_xfer_command_buffer(CommandBufferUsage::OneTimeSubmit)?;
-			cmd_buf.texture2d_raw(new_size, new_size, self.image_view.format(), &image_data);
-			cmd_buf.build_and_execute_now();
+			cmd_buf.update_image(
+				image.clone(),
+				&image_data,
+				[x as _, y as _, 0],
+				Some([width as _, height as _, 1]),
+			)?;
 		}
+		cmd_buf.build_and_execute_now()?;
 
 		self.size = new_size;
 
@@ -231,6 +243,16 @@ impl InnerAtlas {
 
 	fn trim(&mut self) {
 		self.glyphs_in_use.clear();
+	}
+
+	fn rebind_descriptor(&mut self) -> anyhow::Result<()> {
+		self.image_descriptor = self.common.pipeline.uniform_sampler(
+			0,
+			Self::binding(self.kind),
+			self.image_view.clone(),
+			Filter::Nearest,
+		)?;
+		Ok(())
 	}
 }
 
@@ -294,56 +316,43 @@ pub enum ColorMode {
 
 /// An atlas containing a cache of rasterized glyphs that can be rendered.
 pub struct TextAtlas {
-	cache: Cache,
-	pub(crate) bind_group: BindGroup,
-	pub(crate) color_atlas: InnerAtlas,
-	pub(crate) mask_atlas: InnerAtlas,
-	pub(crate) format: Format,
-	pub(crate) color_mode: ColorMode,
+	pub(super) common: CommonResources,
+	pub(super) color_atlas: InnerAtlas,
+	pub(super) mask_atlas: InnerAtlas,
+	pub(super) format: Format,
+	pub(super) color_mode: ColorMode,
 }
 
 impl TextAtlas {
 	/// Creates a new [`TextAtlas`].
-	pub fn new(cache: &Cache, format: Format) -> Self {
+	pub fn new(cache: &CommonResources, format: Format) -> anyhow::Result<Self> {
 		Self::with_color_mode(cache, format, ColorMode::Accurate)
 	}
 
 	/// Creates a new [`TextAtlas`] with the given [`ColorMode`].
-	pub fn with_color_mode(cache: &Cache, format: Format, color_mode: ColorMode) -> Self {
+	pub fn with_color_mode(
+		common: &CommonResources,
+		format: Format,
+		color_mode: ColorMode,
+	) -> anyhow::Result<Self> {
 		let color_atlas = InnerAtlas::new(
-			cache.device,
-			cache.transfer_queue,
-			cache.graphics_queue,
-			cache.memory_allocator,
+			common.clone(),
 			Kind::Color {
 				srgb: match color_mode {
 					ColorMode::Accurate => true,
 					ColorMode::Web => false,
 				},
 			},
-		);
-		let mask_atlas = InnerAtlas::new(
-			cache.device,
-			cache.transfer_queue,
-			cache.graphics_queue,
-			cache.memory_allocator,
-			Kind::Mask,
-		);
+		)?;
+		let mask_atlas = InnerAtlas::new(common.clone(), Kind::Mask)?;
 
-		let bind_group = cache.create_atlas_bind_group(
-			cache.device,
-			&color_atlas.image_view,
-			&mask_atlas.image_view,
-		);
-
-		Self {
-			cache: cache.clone(),
-			bind_group,
+		Ok(Self {
+			common: common.clone(),
 			color_atlas,
 			mask_atlas,
 			format,
 			color_mode,
-		}
+		})
 	}
 
 	pub fn trim(&mut self) {
@@ -353,38 +362,31 @@ impl TextAtlas {
 
 	pub(crate) fn grow(
 		&mut self,
-		device: &Device,
-		queue: &Queue,
 		font_system: &mut FontSystem,
 		cache: &mut SwashCache,
 		content_type: ContentType,
 		scale_factor: f32,
 		rasterize_custom_glyph: impl FnMut(RasterizeCustomGlyphRequest) -> Option<RasterizedCustomGlyph>,
-	) -> bool {
+	) -> anyhow::Result<bool> {
 		let did_grow = match content_type {
-			ContentType::Mask => self.mask_atlas.grow(
-				device,
-				queue,
-				font_system,
-				cache,
-				scale_factor,
-				rasterize_custom_glyph,
-			),
-			ContentType::Color => self.color_atlas.grow(
-				device,
-				queue,
-				font_system,
-				cache,
-				scale_factor,
-				rasterize_custom_glyph,
-			),
+			ContentType::Mask => {
+				self
+					.mask_atlas
+					.grow(font_system, cache, scale_factor, rasterize_custom_glyph)?
+			}
+			ContentType::Color => {
+				self
+					.color_atlas
+					.grow(font_system, cache, scale_factor, rasterize_custom_glyph)?
+			}
 		};
 
 		if did_grow {
-			self.rebind(device);
+			self.color_atlas.rebind_descriptor()?;
+			self.mask_atlas.rebind_descriptor()?;
 		}
 
-		did_grow
+		Ok(did_grow)
 	}
 
 	pub(crate) fn inner_for_content_mut(&mut self, content_type: ContentType) -> &mut InnerAtlas {
@@ -392,24 +394,5 @@ impl TextAtlas {
 			ContentType::Color => &mut self.color_atlas,
 			ContentType::Mask => &mut self.mask_atlas,
 		}
-	}
-
-	pub(crate) fn get_or_create_pipeline(
-		&self,
-		device: Arc<Device>,
-		multisample: MultisampleState,
-		depth_stencil: Option<DepthStencilState>,
-	) -> Arc<GraphicsPipeline> {
-		self
-			.cache
-			.get_or_create_pipeline(device, self.format, multisample, depth_stencil)
-	}
-
-	fn rebind(&mut self, device: Arc<Device>) {
-		self.bind_group = self.cache.create_atlas_bind_group(
-			device,
-			&self.color_atlas.image_view,
-			&self.mask_atlas.image_view,
-		);
 	}
 }

@@ -1,10 +1,10 @@
-//mod cache;
+mod common;
 mod custom_glyph;
-//mod error;
-//mod shaders;
-//mod text_atlas;
-//mod text_renderer;
-//mod viewport;
+mod error;
+mod shaders;
+mod text_atlas;
+mod text_renderer;
+mod viewport;
 
 use std::sync::{LazyLock, Mutex};
 
@@ -252,34 +252,6 @@ pub(crate) struct GlyphDetails {
 	atlas_id: Option<AllocId>,
 	top: i16,
 	left: i16,
-}
-
-#[repr(C)]
-#[derive(Clone, Copy, Debug)]
-pub(crate) struct GlyphToRender {
-	pos: [i32; 2],
-	dim: [u16; 2],
-	uv: [u16; 2],
-	color: u32,
-	content_type_with_srgb: [u16; 2],
-	depth: f32,
-}
-
-/// The screen resolution to use when rendering text.
-#[repr(C)]
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub struct Resolution {
-	/// The width of the screen in pixels.
-	pub width: u32,
-	/// The height of the screen in pixels.
-	pub height: u32,
-}
-
-#[repr(C)]
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub(crate) struct Params {
-	screen_resolution: Resolution,
-	_pad: [u32; 2],
 }
 
 /// Controls the visible area of the text. Any text outside of the visible area will be clipped.

@@ -3,6 +3,7 @@ pub mod layout;
 pub mod parser;
 pub mod text;
 pub mod transform_stack;
+pub mod wgfx;
 pub mod widget;
 
 // re-exported libs

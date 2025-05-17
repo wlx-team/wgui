@@ -1,4 +1,4 @@
-use std::{marker::PhantomData, slice::Iter, sync::Arc};
+use std::{marker::PhantomData, ops::Range, slice::Iter, sync::Arc};
 
 use smallvec::smallvec;
 use vulkano::{
@@ -108,7 +108,25 @@ impl WGfx {
 		})
 	}
 
-	pub fn upload_buffer<T>(
+	pub fn empty_buffer<T>(&self, usage: BufferUsage, capacity: u64) -> anyhow::Result<Subbuffer<[T]>>
+	where
+		T: BufferContents + Clone,
+	{
+		Ok(Buffer::new_slice(
+			self.memory_allocator.clone(),
+			BufferCreateInfo {
+				usage,
+				..Default::default()
+			},
+			AllocationCreateInfo {
+				memory_type_filter: MemoryTypeFilter::PREFER_HOST | MemoryTypeFilter::HOST_SEQUENTIAL_WRITE,
+				..Default::default()
+			},
+			capacity,
+		)?)
+	}
+
+	pub fn new_buffer<T>(
 		&self,
 		usage: BufferUsage,
 		contents: Iter<'_, T>,
@@ -130,11 +148,12 @@ impl WGfx {
 		)?)
 	}
 
-	pub fn render_texture(
+	pub fn new_image(
 		&self,
 		width: u32,
 		height: u32,
 		format: Format,
+		usage: ImageUsage,
 	) -> anyhow::Result<Arc<Image>> {
 		Ok(Image::new(
 			self.memory_allocator.clone(),
@@ -142,7 +161,7 @@ impl WGfx {
 				image_type: ImageType::Dim2d,
 				format,
 				extent: [width, height, 1],
-				usage: ImageUsage::TRANSFER_SRC | ImageUsage::SAMPLED | ImageUsage::COLOR_ATTACHMENT,
+				usage,
 				..Default::default()
 			},
 			AllocationCreateInfo::default(),
@@ -181,7 +200,7 @@ impl WGfx {
 			graphics: self.clone(),
 			queue: self.queue_gfx.clone(),
 			command_buffer,
-			dummy: None,
+			_dummy: PhantomData,
 		})
 	}
 
@@ -198,7 +217,7 @@ impl WGfx {
 			graphics: self.clone(),
 			queue: self.queue_xfer.clone(),
 			command_buffer,
-			dummy: None,
+			_dummy: PhantomData,
 		})
 	}
 }
@@ -213,7 +232,7 @@ pub struct WCommandBuffer<T> {
 	pub graphics: Arc<WGfx>,
 	pub command_buffer: AutoCommandBufferBuilder<PrimaryAutoCommandBuffer>,
 	pub queue: Arc<Queue>,
-	dummy: Option<T>,
+	_dummy: PhantomData<T>,
 }
 
 impl<T> WCommandBuffer<T> {
@@ -266,19 +285,13 @@ impl WCommandBuffer<CmdBufGfx> {
 }
 
 impl WCommandBuffer<CmdBufXfer> {
-	pub fn texture2d_raw(
+	pub fn upload_image(
 		&mut self,
 		width: u32,
 		height: u32,
 		format: Format,
 		data: &[u8],
 	) -> anyhow::Result<Arc<Image>> {
-		log::debug!(
-			"Texture2D: {}x{} {}MB",
-			width,
-			height,
-			data.len() / (1024 * 1024)
-		);
 		let image = Image::new(
 			self.graphics.memory_allocator.clone(),
 			ImageCreateInfo {
@@ -311,6 +324,38 @@ impl WCommandBuffer<CmdBufXfer> {
 			.copy_buffer_to_image(CopyBufferToImageInfo::buffer_image(buffer, image.clone()))?;
 
 		Ok(image)
+	}
+
+	pub fn update_image(
+		&mut self,
+		image: Arc<Image>,
+		data: &[u8],
+		offset: [u32; 3],
+		extent: Option<[u32; 3]>,
+	) -> anyhow::Result<()> {
+		let buffer: Subbuffer<[u8]> = Buffer::new_slice(
+			self.graphics.memory_allocator.clone(),
+			BufferCreateInfo {
+				usage: BufferUsage::TRANSFER_SRC,
+				..Default::default()
+			},
+			AllocationCreateInfo {
+				memory_type_filter: MemoryTypeFilter::PREFER_HOST | MemoryTypeFilter::HOST_SEQUENTIAL_WRITE,
+				..Default::default()
+			},
+			data.len() as DeviceSize,
+		)?;
+
+		buffer.write()?.copy_from_slice(data);
+
+		let mut copy_info = CopyBufferToImageInfo::buffer_image(buffer, image.clone());
+		copy_info.regions[0].image_offset = offset;
+		if let Some(extent) = extent {
+			copy_info.regions[0].image_extent = extent;
+		}
+
+		self.command_buffer.copy_buffer_to_image(copy_info)?;
+		Ok(())
 	}
 }
 
@@ -387,14 +432,32 @@ where
 		})
 	}
 
-	pub fn create_pass(
+	pub fn create_pass_vertices(
 		self: &Arc<Self>,
 		dimensions: [f32; 2],
-		vertex_buffer: Subbuffer<V>,
+		vertex_buffer: Subbuffer<[V]>,
+		vertices: Range<u32>,
+		instances: Range<u32>,
+		descriptor_sets: Vec<Arc<DescriptorSet>>,
+	) -> anyhow::Result<WGfxPass<V>> {
+		WGfxPass::new_vertices(
+			self.clone(),
+			dimensions,
+			vertex_buffer,
+			vertices,
+			instances,
+			descriptor_sets,
+		)
+	}
+
+	pub fn create_pass_indexed(
+		self: &Arc<Self>,
+		dimensions: [f32; 2],
+		vertex_buffer: Subbuffer<[V]>,
 		index_buffer: IndexBuffer,
 		descriptor_sets: Vec<Arc<DescriptorSet>>,
 	) -> anyhow::Result<WGfxPass<V>> {
-		WGfxPass::new(
+		WGfxPass::new_indexed(
 			self.clone(),
 			dimensions,
 			vertex_buffer,
@@ -410,6 +473,7 @@ where
 	pub fn uniform_sampler(
 		&self,
 		set: usize,
+		binding: u32,
 		texture: Arc<ImageView>,
 		filter: Filter,
 	) -> anyhow::Result<Arc<DescriptorSet>> {
@@ -428,16 +492,41 @@ where
 		Ok(DescriptorSet::new(
 			self.graphics.descriptor_set_allocator.clone(),
 			layout.clone(),
-			[WriteDescriptorSet::image_view_sampler(0, texture, sampler)],
+			[WriteDescriptorSet::image_view_sampler(
+				binding, texture, sampler,
+			)],
 			[],
 		)?)
 	}
 
-	pub fn uniform_buffer<T>(&self, set: usize, data: Vec<T>) -> anyhow::Result<Arc<DescriptorSet>>
+	pub fn uniform_buffer<T>(
+		&self,
+		set: usize,
+		binding: u32,
+		buffer: Subbuffer<[T]>,
+	) -> anyhow::Result<Arc<DescriptorSet>>
 	where
 		T: BufferContents + Copy,
 	{
-		let uniform_buffer = SubbufferAllocator::new(
+		let layout = self.pipeline.layout().set_layouts().get(set).unwrap(); // want panic
+		Ok(DescriptorSet::new(
+			self.graphics.descriptor_set_allocator.clone(),
+			layout.clone(),
+			[WriteDescriptorSet::buffer(binding, buffer)],
+			[],
+		)?)
+	}
+
+	pub fn uniform_buffer_upload<T>(
+		&self,
+		set: usize,
+		binding: u32,
+		data: Vec<T>,
+	) -> anyhow::Result<Arc<DescriptorSet>>
+	where
+		T: BufferContents + Copy,
+	{
+		let buf = SubbufferAllocator::new(
 			self.graphics.memory_allocator.clone(),
 			SubbufferAllocatorCreateInfo {
 				buffer_usage: BufferUsage::UNIFORM_BUFFER,
@@ -448,18 +537,12 @@ where
 		);
 
 		let uniform_buffer_subbuffer = {
-			let subbuffer = uniform_buffer.allocate_slice(data.len() as _)?;
+			let subbuffer = buf.allocate_slice(data.len() as _)?;
 			subbuffer.write()?.copy_from_slice(data.as_slice());
 			subbuffer
 		};
 
-		let layout = self.pipeline.layout().set_layouts().get(set).unwrap(); // want panic
-		Ok(DescriptorSet::new(
-			self.graphics.descriptor_set_allocator.clone(),
-			layout.clone(),
-			[WriteDescriptorSet::buffer(0, uniform_buffer_subbuffer)],
-			[],
-		)?)
+		self.uniform_buffer(set, binding, uniform_buffer_subbuffer)
 	}
 }
 
@@ -475,10 +558,10 @@ impl<V> WGfxPass<V>
 where
 	V: BufferContents + Vertex,
 {
-	fn new(
+	fn new_indexed(
 		pipeline: Arc<WGfxPipeline<V>>,
 		dimensions: [f32; 2],
-		vertex_buffer: Subbuffer<V>,
+		vertex_buffer: Subbuffer<[V]>,
 		index_buffer: IndexBuffer,
 		descriptor_sets: Vec<Arc<DescriptorSet>>,
 	) -> anyhow::Result<Self> {
@@ -517,6 +600,61 @@ where
 				.bind_vertex_buffers(0, vertex_buffer)?
 				.bind_index_buffer(index_buffer.clone())?
 				.draw_indexed(index_buffer.len() as u32, 1, 0, 0, 0)?
+		};
+
+		Ok(Self {
+			command_buffer: command_buffer.build()?,
+			_dummy: PhantomData,
+		})
+	}
+
+	fn new_vertices(
+		pipeline: Arc<WGfxPipeline<V>>,
+		dimensions: [f32; 2],
+		vertex_buffer: Subbuffer<[V]>,
+		vertices: Range<u32>,
+		instances: Range<u32>,
+		descriptor_sets: Vec<Arc<DescriptorSet>>,
+	) -> anyhow::Result<Self> {
+		let viewport = Viewport {
+			offset: [0.0, 0.0],
+			extent: dimensions,
+			depth_range: 0.0..=1.0,
+		};
+		let pipeline_inner = pipeline.inner();
+		let mut command_buffer = AutoCommandBufferBuilder::secondary(
+			pipeline.graphics.command_buffer_allocator.clone(),
+			pipeline.graphics.queue_gfx.queue_family_index(),
+			CommandBufferUsage::MultipleSubmit,
+			CommandBufferInheritanceInfo {
+				render_pass: Some(CommandBufferInheritanceRenderPassType::BeginRendering(
+					CommandBufferInheritanceRenderingInfo {
+						color_attachment_formats: vec![Some(pipeline.format)],
+
+						..Default::default()
+					},
+				)),
+				..Default::default()
+			},
+		)?;
+
+		unsafe {
+			command_buffer
+				.set_viewport(0, smallvec![viewport])?
+				.bind_pipeline_graphics(pipeline_inner)?
+				.bind_descriptor_sets(
+					PipelineBindPoint::Graphics,
+					pipeline.inner().layout().clone(),
+					0,
+					descriptor_sets,
+				)?
+				.bind_vertex_buffers(0, vertex_buffer)?
+				.draw(
+					vertices.end - vertices.start,
+					instances.end - instances.start,
+					vertices.start,
+					instances.start,
+				)?
 		};
 
 		Ok(Self {

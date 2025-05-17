@@ -1,64 +1,55 @@
-use crate::wgfx::{WGfx, WGfxPipeline};
+use crate::wgfx::GfxCommandBuffer;
 
 use super::{
-	ContentType, FontSystem, GlyphDetails, GlyphToRender, GpuCacheStatus, SwashCache, TextArea,
-	custom_glyph::{CustomGlyphCacheKey, RasterizeCustomGlyphRequest},
-	error::PrepareError,
+	ContentType, FontSystem, GlyphDetails, GpuCacheStatus, SwashCache, TextArea,
+	common::{CommonResources, GlyphVertex},
+	custom_glyph::{CustomGlyphCacheKey, RasterizeCustomGlyphRequest, RasterizedCustomGlyph},
+	error::PrepareStatus,
 	text_atlas::{ColorMode, TextAtlas},
+	viewport::Viewport,
 };
 use cosmic_text::{Color, SubpixelBin, SwashContent};
-use std::slice;
 use vulkano::{
-	buffer::Buffer,
-	pipeline::graphics::{
-		depth_stencil::DepthStencilState, multisample::MultisampleState, viewport::Viewport,
-	},
+	buffer::{BufferUsage, Subbuffer},
+	command_buffer::CommandBufferUsage,
 };
 
 /// A text renderer that uses cached glyphs to render text into an existing render pass.
 pub struct TextRenderer {
-	gfx: WGfx,
-	vertex_buffer: Option<Buffer>,
-	vertex_buffer_size: u64,
-	pipeline: WGfxPipeline,
-	glyph_vertices: Vec<GlyphToRender>,
+	common: CommonResources,
+	vertex_buffer: Subbuffer<[GlyphVertex]>,
+	vertex_buffer_capacity: usize,
+	glyph_vertices: Vec<GlyphVertex>,
 }
 
 impl TextRenderer {
 	/// Creates a new `TextRenderer`.
-	pub fn new(
-		atlas: &mut TextAtlas,
-		gfx: WGfx,
-		multisample: MultisampleState,
-		depth_stencil: Option<DepthStencilState>,
-	) -> Self {
-		let vertex_buffer_size = next_copy_buffer_size(4096);
+	pub fn new(atlas: &mut TextAtlas) -> anyhow::Result<Self> {
+		const INITIAL_CAPACITY: usize = 4096;
 
-		let pipeline = atlas.get_or_create_pipeline(device, multisample, depth_stencil);
+		let vertex_buffer = atlas.common.gfx.empty_buffer(
+			BufferUsage::VERTEX_BUFFER | BufferUsage::TRANSFER_DST,
+			INITIAL_CAPACITY as _,
+		)?;
 
-		Self {
-			gfx,
-			vertex_buffer: None,
-			vertex_buffer_size,
-			pipeline,
+		Ok(Self {
+			common: atlas.common.clone(),
+			vertex_buffer,
+			vertex_buffer_capacity: INITIAL_CAPACITY,
 			glyph_vertices: Vec::new(),
-		}
+		})
 	}
 
 	/// Prepares all of the provided text areas for rendering.
 	pub fn prepare<'a>(
 		&mut self,
-		device: &Device,
-		queue: &Queue,
 		font_system: &mut FontSystem,
 		atlas: &mut TextAtlas,
 		viewport: &Viewport,
 		text_areas: impl IntoIterator<Item = TextArea<'a>>,
 		cache: &mut SwashCache,
-	) -> Result<(), PrepareError> {
+	) -> anyhow::Result<()> {
 		self.prepare_with_depth_and_custom(
-			device,
-			queue,
 			font_system,
 			atlas,
 			viewport,
@@ -72,18 +63,14 @@ impl TextRenderer {
 	/// Prepares all of the provided text areas for rendering.
 	pub fn prepare_with_depth<'a>(
 		&mut self,
-		device: &Device,
-		queue: &Queue,
 		font_system: &mut FontSystem,
 		atlas: &mut TextAtlas,
 		viewport: &Viewport,
 		text_areas: impl IntoIterator<Item = TextArea<'a>>,
 		cache: &mut SwashCache,
 		metadata_to_depth: impl FnMut(usize) -> f32,
-	) -> Result<(), PrepareError> {
+	) -> anyhow::Result<()> {
 		self.prepare_with_depth_and_custom(
-			device,
-			queue,
 			font_system,
 			atlas,
 			viewport,
@@ -97,18 +84,14 @@ impl TextRenderer {
 	/// Prepares all of the provided text areas for rendering.
 	pub fn prepare_with_custom<'a>(
 		&mut self,
-		device: &Device,
-		queue: &Queue,
 		font_system: &mut FontSystem,
 		atlas: &mut TextAtlas,
 		viewport: &Viewport,
 		text_areas: impl IntoIterator<Item = TextArea<'a>>,
 		cache: &mut SwashCache,
 		rasterize_custom_glyph: impl FnMut(RasterizeCustomGlyphRequest) -> Option<RasterizedCustomGlyph>,
-	) -> Result<(), PrepareError> {
+	) -> anyhow::Result<()> {
 		self.prepare_with_depth_and_custom(
-			device,
-			queue,
 			font_system,
 			atlas,
 			viewport,
@@ -122,8 +105,6 @@ impl TextRenderer {
 	/// Prepares all of the provided text areas for rendering.
 	pub fn prepare_with_depth_and_custom<'a>(
 		&mut self,
-		device: &Device,
-		queue: &Queue,
 		font_system: &mut FontSystem,
 		atlas: &mut TextAtlas,
 		viewport: &Viewport,
@@ -131,7 +112,7 @@ impl TextRenderer {
 		cache: &mut SwashCache,
 		mut metadata_to_depth: impl FnMut(usize) -> f32,
 		mut rasterize_custom_glyph: impl FnMut(RasterizeCustomGlyphRequest) -> Option<RasterizedCustomGlyph>,
-	) -> Result<(), PrepareError> {
+	) -> anyhow::Result<()> {
 		self.glyph_vertices.clear();
 
 		let resolution = viewport.resolution();
@@ -139,8 +120,8 @@ impl TextRenderer {
 		for text_area in text_areas {
 			let bounds_min_x = text_area.bounds.left.max(0);
 			let bounds_min_y = text_area.bounds.top.max(0);
-			let bounds_max_x = text_area.bounds.right.min(resolution.width as i32);
-			let bounds_max_y = text_area.bounds.bottom.min(resolution.height as i32);
+			let bounds_max_x = text_area.bounds.right.min(resolution[0] as i32);
+			let bounds_max_y = text_area.bounds.bottom.min(resolution[1] as i32);
 
 			for glyph in text_area.custom_glyphs.iter() {
 				let x = text_area.left + (glyph.left * text_area.scale);
@@ -179,8 +160,6 @@ impl TextRenderer {
 					glyph.metadata,
 					cache_key,
 					atlas,
-					device,
-					queue,
 					cache,
 					font_system,
 					text_area.scale,
@@ -252,8 +231,6 @@ impl TextRenderer {
 						glyph.metadata,
 						GlyphonCacheKey::Text(physical_glyph.cache_key),
 						atlas,
-						device,
-						queue,
 						cache,
 						font_system,
 						text_area.scale,
@@ -297,28 +274,16 @@ impl TextRenderer {
 		}
 
 		let vertices = self.glyph_vertices.as_slice();
-		let vertices_raw = unsafe {
-			slice::from_raw_parts(
-				vertices as *const _ as *const u8,
-				std::mem::size_of_val(vertices),
-			)
-		};
 
-		if self.vertex_buffer_size >= vertices_raw.len() as u64 {
-			queue.write_buffer(&self.vertex_buffer, 0, vertices_raw);
-		} else {
-			self.vertex_buffer.destroy();
-
-			let (buffer, buffer_size) = create_oversized_buffer(
-				device,
-				Some("glyphon vertices"),
-				vertices_raw,
-				BufferUsages::VERTEX | BufferUsages::COPY_DST,
-			);
-
-			self.vertex_buffer = buffer;
-			self.vertex_buffer_size = buffer_size;
+		while self.vertex_buffer_capacity < vertices.len() {
+			let new_capacity = self.vertex_buffer_capacity * 2;
+			self.vertex_buffer = self.common.gfx.empty_buffer(
+				BufferUsage::VERTEX_BUFFER | BufferUsage::TRANSFER_DST,
+				new_capacity as _,
+			)?;
+			self.vertex_buffer_capacity = new_capacity;
 		}
+		self.vertex_buffer.write()?.clone_from_slice(vertices);
 
 		Ok(())
 	}
@@ -328,19 +293,27 @@ impl TextRenderer {
 		&self,
 		atlas: &TextAtlas,
 		viewport: &Viewport,
-		pass: &mut RenderPass<'_>,
-	) -> Result<(), RenderError> {
+		cmd_buf: &mut GfxCommandBuffer,
+	) -> anyhow::Result<()> {
 		if self.glyph_vertices.is_empty() {
 			return Ok(());
 		}
 
-		pass.set_pipeline(&self.pipeline);
-		pass.set_bind_group(0, &atlas.bind_group, &[]);
-		pass.set_bind_group(1, &viewport.bind_group, &[]);
-		pass.set_vertex_buffer(0, self.vertex_buffer.slice(..));
-		pass.draw(0..4, 0..self.glyph_vertices.len() as u32);
+		let descriptor_sets = vec![
+			atlas.color_atlas.image_descriptor.clone(),
+			atlas.mask_atlas.image_descriptor.clone(),
+			viewport.params_descriptor.clone(),
+		];
 
-		Ok(())
+		let pass = self.common.pipeline.create_pass_vertices(
+			[0., 0.],
+			self.vertex_buffer.clone(),
+			0..4,
+			0..self.glyph_vertices.len() as u32,
+			descriptor_sets,
+		)?;
+
+		cmd_buf.run_ref(&pass)
 	}
 }
 
@@ -355,30 +328,6 @@ enum TextColorConversion {
 pub(crate) enum GlyphonCacheKey {
 	Text(cosmic_text::CacheKey),
 	Custom(CustomGlyphCacheKey),
-}
-
-fn next_copy_buffer_size(size: u64) -> u64 {
-	const COPY_BUFFER_ALIGNMENT: u64 = 4;
-	let align_mask = COPY_BUFFER_ALIGNMENT - 1;
-	((size.next_power_of_two() + align_mask) & !align_mask).max(COPY_BUFFER_ALIGNMENT)
-}
-
-fn create_oversized_buffer(
-	device: &Device,
-	label: Option<&str>,
-	contents: &[u8],
-	usage: BufferUsages,
-) -> (Buffer, u64) {
-	let size = next_copy_buffer_size(contents.len() as u64);
-	let buffer = device.create_buffer(&BufferDescriptor {
-		label,
-		size,
-		usage,
-		mapped_at_creation: true,
-	});
-	buffer.slice(..).get_mapped_range_mut()[..contents.len()].copy_from_slice(contents);
-	buffer.unmap();
-	(buffer, size)
 }
 
 fn zero_depth(_: usize) -> f32 {
@@ -402,8 +351,6 @@ fn prepare_glyph<R>(
 	metadata: usize,
 	cache_key: GlyphonCacheKey,
 	atlas: &mut TextAtlas,
-	device: &Device,
-	queue: &Queue,
 	cache: &mut SwashCache,
 	font_system: &mut FontSystem,
 	scale_factor: f32,
@@ -414,10 +361,11 @@ fn prepare_glyph<R>(
 	get_glyph_image: impl FnOnce(&mut SwashCache, &mut FontSystem, &mut R) -> Option<GetGlyphImageResult>,
 	mut metadata_to_depth: impl FnMut(usize) -> f32,
 	mut rasterize_custom_glyph: R,
-) -> Result<Option<GlyphToRender>, PrepareError>
+) -> anyhow::Result<Option<GlyphVertex>>
 where
 	R: FnMut(RasterizeCustomGlyphRequest) -> Option<RasterizedCustomGlyph>,
 {
+	let gfx = atlas.common.gfx.clone();
 	let details = if let Some(details) = atlas.mask_atlas.glyph_cache.get(&cache_key) {
 		atlas.mask_atlas.glyphs_in_use.insert(cache_key);
 		details
@@ -440,15 +388,13 @@ where
 					Some(a) => break a,
 					None => {
 						if !atlas.grow(
-							device,
-							queue,
 							font_system,
 							cache,
 							image.content_type,
 							scale_factor,
 							&mut rasterize_custom_glyph,
-						) {
-							return Err(PrepareError::AtlasFull);
+						)? {
+							Err(PrepareStatus::AtlasFull)?;
 						}
 
 						inner = atlas.inner_for_content_mut(image.content_type);
@@ -457,29 +403,16 @@ where
 			};
 			let atlas_min = allocation.rectangle.min;
 
-			queue.write_texture(
-				TexelCopyTextureInfo {
-					texture: &inner.texture,
-					mip_level: 0,
-					origin: Origin3d {
-						x: atlas_min.x as u32,
-						y: atlas_min.y as u32,
-						z: 0,
-					},
-					aspect: TextureAspect::All,
-				},
+			let mut cmd_buf = gfx.create_xfer_command_buffer(CommandBufferUsage::OneTimeSubmit)?;
+
+			cmd_buf.update_image(
+				inner.image_view.image().clone(),
 				&image.data,
-				TexelCopyBufferLayout {
-					offset: 0,
-					bytes_per_row: Some(image.width as u32 * inner.num_channels() as u32),
-					rows_per_image: None,
-				},
-				Extent3d {
-					width: image.width as u32,
-					height: image.height as u32,
-					depth_or_array_layers: 1,
-				},
-			);
+				[atlas_min.x as _, atlas_min.y as _, 0],
+				Some([image.width as _, image.height as _, 1]),
+			)?;
+
+			cmd_buf.build_and_execute_now()?; //TODO: remove needless fence wait
 
 			(
 				GpuCacheStatus::InAtlas {
@@ -560,8 +493,8 @@ where
 
 	let depth = metadata_to_depth(metadata);
 
-	Ok(Some(GlyphToRender {
-		pos: [x, y],
+	Ok(Some(GlyphVertex {
+		in_pos: [x, y],
 		dim: [width as u16, height as u16],
 		uv: [atlas_x, atlas_y],
 		color: color.0,
