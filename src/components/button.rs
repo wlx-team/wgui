@@ -4,7 +4,7 @@ use taffy::{
 };
 
 use crate::{
-	drawing::Color,
+	drawing::{self, Color},
 	layout::{Layout, WidgetID},
 	text::{FontWeight, TextStyle},
 	widget::{
@@ -13,12 +13,25 @@ use crate::{
 	},
 };
 
-#[derive(Default)]
 pub struct Params<'a> {
 	pub text: &'a str,
+	pub color: drawing::Color,
 }
 
-pub fn construct(layout: &mut Layout, parent: WidgetID, params: Params) -> anyhow::Result<()> {
+impl Default for Params<'_> {
+	fn default() -> Self {
+		Self {
+			text: "Text",
+			color: drawing::Color([1.0, 1.0, 1.0, 1.0]),
+		}
+	}
+}
+
+pub struct Button {
+	// to be filled later
+}
+
+pub fn construct(layout: &mut Layout, parent: WidgetID, params: Params) -> anyhow::Result<Button> {
 	// simulate a border because we don't have it yet
 	let outer_border = layout.add_child(
 		parent,
@@ -38,7 +51,7 @@ pub fn construct(layout: &mut Layout, parent: WidgetID, params: Params) -> anyho
 	let inner_bg = layout.add_child(
 		outer_border,
 		Rectangle::new(RectangleParams {
-			color: Color([0.9, 0.9, 0.9, 1.0]),
+			color: params.color,
 		})?,
 		taffy::Style {
 			size: taffy::Size {
@@ -51,12 +64,21 @@ pub fn construct(layout: &mut Layout, parent: WidgetID, params: Params) -> anyho
 		},
 	)?;
 
+	let color = &params.color.0;
+
+	let light_text = (color[0] + color[1] + color[2]) < 1.5;
+
 	layout.add_child(
 		inner_bg,
 		TextLabel::new(TextParams {
 			content: String::from(params.text),
 			style: TextStyle {
 				weight: Some(FontWeight::Bold),
+				color: Some(if light_text {
+					Color([1.0, 1.0, 1.0, 1.0])
+				} else {
+					Color([0.0, 0.0, 0.0, 1.0])
+				}),
 				..Default::default()
 			},
 		})?,
@@ -65,5 +87,5 @@ pub fn construct(layout: &mut Layout, parent: WidgetID, params: Params) -> anyho
 		},
 	)?;
 
-	Ok(())
+	Ok(Button {})
 }

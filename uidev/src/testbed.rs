@@ -1,18 +1,12 @@
 use tiny_skia::{Paint, Pixmap};
 use wgui::{
-	drawing::{self, Color, RenderPrimitive},
+	drawing::{self, RenderPrimitive},
 	glam::Vec2,
 	layout::Layout,
-	taffy::{self, AlignContent, AlignItems, FlexDirection, prelude::length},
-	text::{FontWeight, HorizontalAlign, TextStyle},
-	widget::{
-		rectangle::{Rectangle, RectangleParams},
-		text::{TextLabel, TextParams},
-	},
 };
 
 pub struct Testbed {
-	layout: Layout,
+	pub layout: Layout,
 }
 
 impl Testbed {
@@ -30,13 +24,18 @@ impl Testbed {
 
 		let my_div_parent = res.require_by_id("my_div_parent")?;
 
-		button::construct(
-			&mut layout,
-			my_div_parent,
-			button::Params {
-				text: "I'm a button!",
-			},
-		)?;
+		// create some buttons for testing
+		for i in 0..10 {
+			let n = i as f32 / 10.0;
+			button::construct(
+				&mut layout,
+				my_div_parent,
+				button::Params {
+					text: "I'm a button!",
+					color: drawing::Color([1.0 - n, n * n, n, 1.0]),
+				},
+			)?;
+		}
 
 		Ok(Self { layout })
 	}
@@ -62,7 +61,7 @@ impl Testbed {
 						None,
 					);
 				}
-				RenderPrimitive::Text(boundary, mut text) => {
+				RenderPrimitive::Text(boundary, text) => {
 					text.draw(boundary, |x, y, w, h, color| {
 						let mut paint = Paint::default();
 						let col = color.0;

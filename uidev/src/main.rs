@@ -1,9 +1,6 @@
-use sdl2::{
-	event::Event,
-	sys::{
-		SDL_CreateRGBSurfaceWithFormatFrom, SDL_FillRect, SDL_FreeSurface, SDL_MapRGB,
-		SDL_PixelFormatEnum, SDL_UpperBlit,
-	},
+use sdl2::sys::{
+	SDL_CreateRGBSurfaceWithFormatFrom, SDL_FillRect, SDL_FreeSurface, SDL_MapRGB,
+	SDL_PixelFormatEnum, SDL_UpperBlit,
 };
 use testbed::Testbed;
 use time::get_millis;
@@ -11,6 +8,7 @@ use tiny_skia::{Pixmap, Transform};
 use tracing_subscriber::{
 	EnvFilter, filter::LevelFilter, layer::SubscriberExt, util::SubscriberInitExt,
 };
+use wgui::glam::Vec2;
 
 pub mod testbed;
 pub mod time;
@@ -61,10 +59,39 @@ fn run() -> Result<(), String> {
 
 		let (width, height) = window.size();
 
+		use sdl2::event::Event as SDLEvent;
+		use wgui::event as WguiEvent;
+
 		for event in event_pump.poll_iter() {
 			match event {
-				Event::Quit { .. } => {
+				SDLEvent::Quit { .. } => {
 					break 'running;
+				}
+				SDLEvent::MouseButtonDown { x, y, .. } => {
+					testbed
+						.layout
+						.push_event(&WguiEvent::Event::MouseDown(WguiEvent::MouseDownEvent {
+							pos: Vec2::new(x as f32, y as f32),
+						}))
+						.unwrap();
+				}
+				SDLEvent::MouseButtonUp { x, y, .. } => {
+					testbed
+						.layout
+						.push_event(&WguiEvent::Event::MouseUp(WguiEvent::MouseUpEvent {
+							pos: Vec2::new(x as f32, y as f32),
+						}))
+						.unwrap();
+				}
+				SDLEvent::MouseMotion { x, y, .. } => {
+					testbed
+						.layout
+						.push_event(&WguiEvent::Event::MouseMotion(
+							WguiEvent::MouseMotionEvent {
+								pos: Vec2::new(x as f32, y as f32),
+							},
+						))
+						.unwrap();
 				}
 				_ => {}
 			}

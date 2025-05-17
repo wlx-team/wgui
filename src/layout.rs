@@ -1,3 +1,9 @@
+use crate::{
+	event,
+	transform_stack::{Transform, TransformStack},
+	widget::{self, EventParams},
+};
+
 use super::widget::{Widget, div::Div};
 use glam::Vec2;
 use slotmap::HopSlotMap;
@@ -76,9 +82,60 @@ impl Layout {
 
 		Ok(child_id)
 	}
-}
 
-impl Layout {
+	fn push_event_widget(
+		&mut self,
+		transform_stack: &mut TransformStack,
+		widget_id: WidgetID,
+		event: &event::Event,
+	) -> anyhow::Result<()> {
+		let Some(widget) = self.widgets.get_mut(widget_id) else {
+			debug_assert!(false);
+			anyhow::bail!("invalid widget");
+		};
+
+		let l = self.tree.layout(widget.data().node)?;
+
+		let transform = Transform {
+			pos: Vec2::new(l.location.x, l.location.y),
+			dim: Vec2::new(l.size.width, l.size.height),
+		};
+
+		transform_stack.push(transform);
+
+		let mut iter_children = true;
+
+		match widget.process_event(event, &EventParams { transform_stack }) {
+			widget::EventResult::Pass => {
+				// go on
+			}
+			widget::EventResult::Consumed => {
+				todo!();
+			}
+			widget::EventResult::Outside => {
+				iter_children = false;
+			}
+		}
+
+		if iter_children {
+			// FIXME: we are copying a vec here !!!!
+			let children = widget.data().children.clone();
+			for child in &children {
+				self.push_event_widget(transform_stack, *child, event)?;
+			}
+		}
+
+		transform_stack.pop();
+
+		Ok(())
+	}
+
+	pub fn push_event(&mut self, event: &event::Event) -> anyhow::Result<()> {
+		let mut transform_stack = TransformStack::new();
+		self.push_event_widget(&mut transform_stack, self.root, event)?;
+		Ok(())
+	}
+
 	pub fn new() -> anyhow::Result<Self> {
 		let mut tree = TaffyTree::new();
 

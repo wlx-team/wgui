@@ -16,7 +16,7 @@
       <label text="I'm a text!" color="#0000FF" />
       <label text="I'm a bold text!" color="#0000FF" weight="bold" />
       <label text="I'm a BIG text!" color="#0000FF" weight="bold" size="20" />
-      <rectangle width="400" height="300" id="my_div_parent" color="#FFCC99" align_items="center" justify_content="center">
+      <rectangle width="400" height="300" id="my_div_parent" color="#FFCC99" align_items="center" align_content="flex_start" justify_content="center" flex_wrap="wrap" gap="8" padding="16">
         <!-- filled-in at runtime -->
       </rectangle>
     </div>

@@ -40,10 +40,19 @@ impl Widget for Rectangle {
 	}
 
 	fn draw(&self, params: &mut super::DrawParams) {
+		let mut color = self.params.color;
+
+		// Just for demonstration purposes (test events). FIXME: Remove later!
+		if self.data.hovered {
+			color.0[0] *= 0.8;
+			color.0[1] *= 0.8;
+			color.0[2] *= 0.8;
+		}
+
 		params.primitives.push(drawing::RenderPrimitive::Rectangle(
 			drawing::Boundary::construct(params.transform_stack),
 			drawing::Rectangle {
-				color: self.params.color,
+				color,
 				round_radius: 0.0,
 			},
 		));
