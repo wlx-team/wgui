@@ -1,5 +1,5 @@
 use crate::{
-	drawing::{self, Boundary},
+	drawing::{self},
 	text::{RenderableText, TextStyle},
 };
 
@@ -44,8 +44,8 @@ impl Widget for TextLabel {
 
 	fn measure(
 		&mut self,
-		known_dimensions: taffy::Size<Option<f32>>,
-		available_space: taffy::Size<taffy::AvailableSpace>,
+		_known_dimensions: taffy::Size<Option<f32>>,
+		_available_space: taffy::Size<taffy::AvailableSpace>,
 	) -> taffy::Size<f32> {
 		todo!();
 	}

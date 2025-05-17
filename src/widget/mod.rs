@@ -1,5 +1,10 @@
-use super::{drawing::RenderPrimitive, layout::WidgetHandle};
-use crate::{layout::Layout, transform_stack::TransformStack};
+use slotmap::Key;
+
+use super::drawing::RenderPrimitive;
+use crate::{
+	layout::{Layout, WidgetID},
+	transform_stack::TransformStack,
+};
 
 pub mod div;
 pub mod rectangle;
@@ -7,25 +12,22 @@ pub mod text;
 
 pub struct WidgetData {
 	pub node: taffy::NodeId,
-	pub children: Vec<WidgetHandle>,
-	pub parent: WidgetHandle,
+	pub children: Vec<WidgetID>,
+	pub parent: WidgetID,
 }
 
 impl WidgetData {
 	fn new() -> anyhow::Result<WidgetData> {
 		Ok(Self {
 			children: Vec::new(),
-			parent: WidgetHandle {
-				idx: 0,
-				generation: u64::MAX, // Unset by default
-			},
+			parent: WidgetID::null(),    // Unset by default
 			node: taffy::NodeId::new(0), // Unset by default
 		})
 	}
 }
 
 pub struct DrawParams<'a> {
-	pub current_widget: WidgetHandle,
+	pub current_widget: WidgetID,
 	pub layout: &'a Layout,
 	pub primitives: &'a mut Vec<RenderPrimitive>,
 	pub transform_stack: &'a mut TransformStack,

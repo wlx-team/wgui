@@ -1,16 +1,12 @@
 use glam::Vec2;
-use taffy::NodeId;
 
 use crate::{
-	layout::WidgetHandle,
+	layout::BoxWidget,
 	text::RenderableText,
 	transform_stack::{Transform, TransformStack},
 };
 
-use super::{
-	layout::{BoxedWidget, Layout},
-	widget::DrawParams,
-};
+use super::{layout::Layout, widget::DrawParams};
 
 pub struct ImageHandle {
 	// to be implemented, will contain pixel data (RGB or RGBA) loaded via "ImageBank" or something by the gui
@@ -63,7 +59,7 @@ pub enum RenderPrimitive {
 	Image(Boundary, Image),
 }
 
-fn draw_children(layout: &Layout, params: &mut DrawParams, widget: &BoxedWidget) {
+fn draw_children(layout: &Layout, params: &mut DrawParams, widget: &BoxWidget) {
 	let Ok(l) = layout.tree.layout(widget.data().node) else {
 		debug_assert!(false);
 		return;
@@ -76,13 +72,13 @@ fn draw_children(layout: &Layout, params: &mut DrawParams, widget: &BoxedWidget)
 
 	widget.draw(params);
 
-	for handle in widget.data().children.iter() {
-		let Some(child) = layout.widgets.get(handle) else {
-			println!("warning: skipping invalid widget handle");
+	for child_id in widget.data().children.iter() {
+		let Some(child) = layout.widgets.get(*child_id) else {
+			println!("warning: skipping invalid widget id");
 			continue;
 		};
 
-		params.current_widget = *handle;
+		params.current_widget = *child_id;
 		draw_children(layout, params, child);
 	}
 
@@ -90,7 +86,7 @@ fn draw_children(layout: &Layout, params: &mut DrawParams, widget: &BoxedWidget)
 }
 
 pub fn draw(layout: &Layout) -> anyhow::Result<Vec<RenderPrimitive>> {
-	let Some(root) = layout.widgets.get(&layout.root) else {
+	let Some(root) = layout.widgets.get(layout.root) else {
 		panic!("root widget doesn't exist"); // This shouldn't happen
 	};
 
