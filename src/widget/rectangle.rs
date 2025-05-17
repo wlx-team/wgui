@@ -8,6 +8,14 @@ pub struct RectangleParams {
 	pub color: drawing::Color,
 }
 
+impl Default for RectangleParams {
+	fn default() -> Self {
+		Self {
+			color: drawing::Color([0.0, 0.0, 0.0, 1.0]),
+		}
+	}
+}
+
 pub struct Rectangle {
 	data: WidgetData,
 	params: RectangleParams,

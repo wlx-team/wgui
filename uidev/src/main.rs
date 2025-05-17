@@ -8,11 +8,32 @@ use sdl2::{
 use testbed::Testbed;
 use time::get_millis;
 use tiny_skia::{Pixmap, Transform};
+use tracing_subscriber::{
+	EnvFilter, filter::LevelFilter, layer::SubscriberExt, util::SubscriberInitExt,
+};
 
 pub mod testbed;
 pub mod time;
 
+fn init_logging() {
+	tracing_subscriber::registry()
+		.with(
+			tracing_subscriber::fmt::layer()
+				.pretty()
+				.with_writer(std::io::stderr),
+		)
+		.with(
+			/* read RUST_LOG env var */
+			EnvFilter::builder()
+				.with_default_directive(LevelFilter::INFO.into())
+				.from_env_lossy(),
+		)
+		.init();
+}
+
 fn run() -> Result<(), String> {
+	init_logging();
+
 	let sdl_context = sdl2::init()?;
 	let video = sdl_context.video()?;
 

@@ -10,6 +10,15 @@ pub struct TextParams {
 	pub style: TextStyle,
 }
 
+impl Default for TextParams {
+	fn default() -> Self {
+		Self {
+			content: Default::default(),
+			style: Default::default(),
+		}
+	}
+}
+
 pub struct TextLabel {
 	data: WidgetData,
 	params: TextParams,
