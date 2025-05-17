@@ -1,7 +1,7 @@
 use super::widget::{Widget, div::Div};
 use crate::gen_id;
 use glam::Vec2;
-use taffy::TaffyTree;
+use taffy::{Size, TaffyTree};
 
 pub type BoxedWidget = Box<dyn Widget>;
 gen_id!(WidgetVec, BoxedWidget, WidgetCell, WidgetHandle);
@@ -114,9 +114,30 @@ impl Layout {
 					width: taffy::AvailableSpace::Definite(size.x),
 					height: taffy::AvailableSpace::Definite(size.y),
 				},
+				/*
+								|known_dimensions, available_space, _node_id, node_context, _style| {
+									if let Size {
+										width: Some(width),
+										height: Some(height),
+									} = known_dimensions
+									{
+										return Size { width, height };
+									}
+
+									match node_context {
+										None => Size::ZERO,
+										Some(h) => {
+											if let Some(w) = self.widgets.get_mut(h) {
+												w.measure(known_dimensions, available_space)
+											} else {
+												Size::ZERO
+											}
+										}
+									}
+								},
+				*/
 			)?;
 		}
-
 		Ok(())
 	}
 }

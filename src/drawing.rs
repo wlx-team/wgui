@@ -1,6 +1,11 @@
 use glam::Vec2;
+use taffy::NodeId;
 
-use crate::transform_stack::{Transform, TransformStack};
+use crate::{
+	layout::WidgetHandle,
+	text::RenderableText,
+	transform_stack::{Transform, TransformStack},
+};
 
 use super::{
 	layout::{BoxedWidget, Layout},
@@ -11,6 +16,7 @@ pub struct ImageHandle {
 	// to be implemented, will contain pixel data (RGB or RGBA) loaded via "ImageBank" or something by the gui
 }
 
+#[derive(Debug, Default, Clone, Copy, PartialEq)]
 pub struct Boundary {
 	pub x: f32,
 	pub y: f32,
@@ -53,6 +59,7 @@ pub struct Image {
 
 pub enum RenderPrimitive {
 	Rectangle(Boundary, Rectangle),
+	Text(Boundary, RenderableText),
 	Image(Boundary, Image),
 }
 
@@ -75,6 +82,7 @@ fn draw_children(layout: &Layout, params: &mut DrawParams, widget: &BoxedWidget)
 			continue;
 		};
 
+		params.current_widget = *handle;
 		draw_children(layout, params, child);
 	}
 
@@ -90,6 +98,7 @@ pub fn draw(layout: &Layout) -> anyhow::Result<Vec<RenderPrimitive>> {
 	let mut transform_stack = TransformStack::new();
 
 	let mut params = DrawParams {
+		current_widget: layout.root,
 		primitives: &mut primitives,
 		transform_stack: &mut transform_stack,
 		layout,

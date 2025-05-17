@@ -1,3 +1,5 @@
+use taffy::Size;
+
 use super::{Widget, WidgetData};
 
 pub struct Div {
@@ -23,5 +25,13 @@ impl Widget for Div {
 
 	fn draw(&self, _params: &mut super::DrawParams) {
 		// no-op
+	}
+
+	fn measure(
+		&mut self,
+		_: taffy::Size<Option<f32>>,
+		_: taffy::Size<taffy::AvailableSpace>,
+	) -> taffy::Size<f32> {
+		Size::ZERO
 	}
 }

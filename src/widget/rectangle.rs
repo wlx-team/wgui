@@ -1,3 +1,5 @@
+use taffy::Size;
+
 use crate::drawing;
 
 use super::{Widget, WidgetData};
@@ -37,5 +39,13 @@ impl Widget for Rectangle {
 				round_radius: 0.0,
 			},
 		));
+	}
+
+	fn measure(
+		&mut self,
+		_: taffy::Size<Option<f32>>,
+		_: taffy::Size<taffy::AvailableSpace>,
+	) -> taffy::Size<f32> {
+		Size::ZERO
 	}
 }
