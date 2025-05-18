@@ -47,36 +47,7 @@ impl TextRenderer {
 		text_areas: impl IntoIterator<Item = TextArea<'a>>,
 		cache: &mut SwashCache,
 	) -> anyhow::Result<()> {
-		self.prepare_with_depth_and_custom(
-			font_system,
-			atlas,
-			viewport,
-			text_areas,
-			cache,
-			zero_depth,
-			|_| None,
-		)
-	}
-
-	/// Prepares all of the provided text areas for rendering.
-	pub fn prepare_with_depth<'a>(
-		&mut self,
-		font_system: &mut FontSystem,
-		atlas: &mut TextAtlas,
-		viewport: &Viewport,
-		text_areas: impl IntoIterator<Item = TextArea<'a>>,
-		cache: &mut SwashCache,
-		metadata_to_depth: impl FnMut(usize) -> f32,
-	) -> anyhow::Result<()> {
-		self.prepare_with_depth_and_custom(
-			font_system,
-			atlas,
-			viewport,
-			text_areas,
-			cache,
-			metadata_to_depth,
-			|_| None,
-		)
+		self.prepare_with_depth_and_custom(font_system, atlas, viewport, text_areas, cache, |_| None)
 	}
 
 	/// Prepares all of the provided text areas for rendering.
@@ -95,7 +66,6 @@ impl TextRenderer {
 			viewport,
 			text_areas,
 			cache,
-			zero_depth,
 			rasterize_custom_glyph,
 		)
 	}
@@ -109,7 +79,6 @@ impl TextRenderer {
 		viewport: &Viewport,
 		text_areas: impl IntoIterator<Item = TextArea<'a>>,
 		cache: &mut SwashCache,
-		mut metadata_to_depth: impl FnMut(usize) -> f32,
 		mut rasterize_custom_glyph: impl FnMut(RasterizeCustomGlyphRequest) -> Option<RasterizedCustomGlyph>,
 	) -> anyhow::Result<()> {
 		self.glyph_vertices.clear();
@@ -156,7 +125,6 @@ impl TextRenderer {
 					y,
 					0.0,
 					color,
-					glyph.metadata,
 					cache_key,
 					atlas,
 					cache,
@@ -166,6 +134,7 @@ impl TextRenderer {
 					bounds_min_y,
 					bounds_max_x,
 					bounds_max_y,
+					text_area.depth,
 					|_cache, _font_system, rasterize_custom_glyph| -> Option<GetGlyphImageResult> {
 						if width == 0 || height == 0 {
 							return None;
@@ -193,7 +162,6 @@ impl TextRenderer {
 							data: output.data,
 						})
 					},
-					&mut metadata_to_depth,
 					&mut rasterize_custom_glyph,
 				)? {
 					self.glyph_vertices.push(glyph_to_render);
@@ -227,7 +195,6 @@ impl TextRenderer {
 						physical_glyph.y,
 						run.line_y,
 						color,
-						glyph.metadata,
 						GlyphonCacheKey::Text(physical_glyph.cache_key),
 						atlas,
 						cache,
@@ -237,6 +204,7 @@ impl TextRenderer {
 						bounds_min_y,
 						bounds_max_x,
 						bounds_max_y,
+						text_area.depth,
 						|cache, font_system, _rasterize_custom_glyph| -> Option<GetGlyphImageResult> {
 							let image = cache.get_image_uncached(font_system, physical_glyph.cache_key)?;
 
@@ -258,7 +226,6 @@ impl TextRenderer {
 								data: image.data,
 							})
 						},
-						&mut metadata_to_depth,
 						&mut rasterize_custom_glyph,
 					)? {
 						self.glyph_vertices.push(glyph_to_render);
@@ -331,10 +298,6 @@ pub(super) enum GlyphonCacheKey {
 	Custom(CustomGlyphCacheKey),
 }
 
-fn zero_depth(_: usize) -> f32 {
-	0f32
-}
-
 struct GetGlyphImageResult {
 	content_type: ContentType,
 	top: i16,
@@ -350,7 +313,6 @@ fn prepare_glyph<R>(
 	y: i32,
 	line_y: f32,
 	color: Color,
-	metadata: usize,
 	cache_key: GlyphonCacheKey,
 	atlas: &mut TextAtlas,
 	cache: &mut SwashCache,
@@ -360,8 +322,8 @@ fn prepare_glyph<R>(
 	bounds_min_y: i32,
 	bounds_max_x: i32,
 	bounds_max_y: i32,
+	depth: f32,
 	get_glyph_image: impl FnOnce(&mut SwashCache, &mut FontSystem, &mut R) -> Option<GetGlyphImageResult>,
-	mut metadata_to_depth: impl FnMut(usize) -> f32,
 	mut rasterize_custom_glyph: R,
 ) -> anyhow::Result<Option<GlyphVertex>>
 where
@@ -496,8 +458,6 @@ where
 	if y + height > bounds_max_y {
 		height = bounds_max_y - y;
 	}
-
-	let depth = metadata_to_depth(metadata);
 
 	Ok(Some(GlyphVertex {
 		in_pos: [x, y],
