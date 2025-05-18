@@ -9,6 +9,10 @@ pub struct RectangleParams {
 	pub color: drawing::Color,
 	pub color2: drawing::Color,
 	pub gradient: GradientMode,
+
+	pub border: f32,
+	pub border_color: drawing::Color,
+
 	pub round: f32,
 }
 
@@ -30,6 +34,8 @@ impl WidgetObj for Rectangle {
 				color: self.params.color,
 				color2: self.params.color2,
 				gradient: self.params.gradient,
+				border: self.params.border,
+				border_color: self.params.border_color,
 				round: self.params.round,
 			},
 		));

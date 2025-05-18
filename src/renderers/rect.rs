@@ -25,7 +25,9 @@ pub struct RectVertex {
 	#[format(R32_UINT)]
 	pub in_color2: u32,
 	#[format(R32_UINT)]
-	pub round_unused_gradient_srgb: [u8; 4],
+	pub in_border_color: u32,
+	#[format(R32_UINT)]
+	pub round_border_gradient_srgb: [u8; 4],
 	#[format(R32_SFLOAT)]
 	pub depth: f32,
 }
@@ -85,9 +87,10 @@ impl RectRenderer {
 			in_dim: [boundary.w as _, boundary.h as _],
 			in_color: cosmic_text::Color::from(rectangle.color).0,
 			in_color2: cosmic_text::Color::from(rectangle.color2).0,
-			round_unused_gradient_srgb: [
+			in_border_color: cosmic_text::Color::from(rectangle.border_color).0,
+			round_border_gradient_srgb: [
 				(rectangle.round * 255.0) as u8,
-				0,
+				rectangle.border as u8,
 				rectangle.gradient as u8,
 				0, //FIXME: srgb vs linear?
 			],
@@ -145,12 +148,15 @@ pub mod vert_rect {
             layout (location = 1) in uint in_dim;
             layout (location = 2) in uint in_color;
             layout (location = 3) in uint in_color2;
-            layout (location = 4) in uint round_unused_gradient_srgb;
-            layout (location = 5) in float depth;
+            layout (location = 4) in uint in_border_color;
+            layout (location = 5) in uint round_border_gradient_srgb;
+            layout (location = 6) in float depth;
 
             layout (location = 0) out vec4 out_color;
             layout (location = 1) out vec2 out_uv;
-            layout (location = 2) out float out_radius;
+            layout (location = 2) out vec4 out_border_color;
+            layout (location = 3) out vec2 out_border;
+            layout (location = 4) out float out_radius;
 
             layout (set = 0, binding = 0) uniform UniformParams {
                 uniform uvec2 screen_resolution;
@@ -183,9 +189,18 @@ pub mod vert_rect {
 								1.0
 							);
 
-              out_radius = float(round_unused_gradient_srgb & 0xffu) / 255.0;
+							out_border_color = vec4(
+									float((in_border_color & 0x00ff0000u) >> 16u) / 255.0,
+									float((in_border_color & 0x0000ff00u) >> 8u) / 255.0,
+									float(in_border_color & 0x000000ffu) / 255.0,
+									float((in_border_color & 0xff000000u) >> 24u) / 255.0
+							);
 
-							uint gradient_mode = (round_unused_gradient_srgb & 0x00ff0000u) >> 16;
+              out_radius = float(round_border_gradient_srgb & 0xffu) / 255.0;
+              float border = float((round_border_gradient_srgb & 0xff00u) >> 8);
+              out_border = vec2(border / float(width), border / float(height));
+
+							uint gradient_mode = (round_border_gradient_srgb & 0x00ff0000u) >> 16;
 
 							uint color;
 							switch (gradient_mode) {
@@ -202,7 +217,7 @@ pub mod vert_rect {
 									break;
 			        }
 
-              uint srgb = (round_unused_gradient_srgb & 0xff000000u) >> 24;
+              uint srgb = (round_border_gradient_srgb & 0xff000000u) >> 24;
 
               if (srgb == 0u) {
 							  out_color = vec4(
@@ -232,18 +247,34 @@ pub mod frag_rect {
 
             layout (location = 0) in vec4 in_color;
             layout (location = 1) in vec2 in_uv;
-            layout (location = 2) in float in_radius;
+            layout (location = 2) in vec4 in_border_color;
+            layout (location = 3) in vec2 in_border;
+            layout (location = 4) in float in_radius;
 
             layout (location = 0) out vec4 out_color;
 
+            layout (set = 0, binding = 0) uniform UniformParams {
+                uniform uvec2 screen_resolution;
+            };
+
             void main()
             {
-								out_color = in_color;
+                vec2 border_uv = abs(in_uv + vec2(-0.5)) * 2. + in_border;
 
-                vec2 uv_circ = ((1. - in_radius) - (abs(in_uv + vec2(-0.5)) * 2.))/in_radius;
+                vec2 uv_circ = ((1. - in_radius) - border_uv) / in_radius;
                 float dist = length(uv_circ);
 
-                out_color.a = mix(out_color.a, 0.,
+                out_color.rgb = mix(in_color.rgb, vec3(in_border_color.rgb),
+                        max(max(float(border_uv.x > 1.0),
+                         float(border_uv.y > 1.0)),
+                        float(dist > 1.)
+                        * float(uv_circ.x < 0.)
+                        * float(uv_circ.y < 0.)));
+
+                uv_circ = ((1. - in_radius) - (abs(in_uv + vec2(-0.5)) * 2.))/in_radius;
+                dist = length(uv_circ);
+
+                out_color.a = mix(in_color.a, 0.,
                         float(dist > 1.)
                         * float(uv_circ.x < 0.)
                         * float(uv_circ.y < 0.));

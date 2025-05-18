@@ -354,6 +354,19 @@ fn parse_widget_rectangle<'a>(
 					0.0
 				});
 			}
+			"border" => {
+				params.border = value.parse().unwrap_or_else(|_| {
+					print_invalid_attrib(key, value);
+					0.0
+				});
+			}
+			"border_color" => {
+				if let Some(color) = parse_color(value) {
+					params.border_color = color;
+				} else {
+					print_invalid_attrib(key, value);
+				}
+			}
 			_ => {}
 		}
 	}

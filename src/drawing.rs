@@ -72,6 +72,9 @@ pub struct Rectangle {
 	pub color2: Color,
 	pub gradient: GradientMode,
 
+	pub border: f32, // width in pixels
+	pub border_color: Color,
+
 	pub round: f32, // 0.0 - 1.0
 }
 
