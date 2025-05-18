@@ -59,7 +59,7 @@ pub struct Rectangle {
 	pub color2: Color,
 	pub gradient: GradientMode,
 
-	pub round_radius: f32, // 0.0 - 1.0
+	pub round: f32, // 0.0 - 1.0
 }
 
 pub struct Image {

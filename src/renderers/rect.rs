@@ -25,7 +25,7 @@ pub struct RectVertex {
 	#[format(R32_UINT)]
 	pub in_color2: u32,
 	#[format(R32_UINT)]
-	pub corner_radius_gradient_srgb: [u8; 4],
+	pub round_unused_gradient_srgb: [u8; 4],
 	#[format(R32_SFLOAT)]
 	pub depth: f32,
 }
@@ -80,20 +80,14 @@ impl RectRenderer {
 	}
 
 	pub fn add_rect(&mut self, boundary: Boundary, rectangle: Rectangle, depth: f32) {
-		let clamped_radius = rectangle
-			.round_radius
-			.min(boundary.w / 2.0)
-			.min(boundary.h / 2.0);
-		let skew_radius = [clamped_radius / boundary.w, clamped_radius / boundary.h];
-
 		self.rect_vertices.push(RectVertex {
 			in_pos: [boundary.x as _, boundary.y as _],
 			in_dim: [boundary.w as _, boundary.h as _],
 			in_color: cosmic_text::Color::from(rectangle.color).0,
 			in_color2: cosmic_text::Color::from(rectangle.color2).0,
-			corner_radius_gradient_srgb: [
-				skew_radius[0] as u8,
-				skew_radius[1] as u8,
+			round_unused_gradient_srgb: [
+				(rectangle.round * 255.0) as u8,
+				0,
 				rectangle.gradient as u8,
 				0, //FIXME: srgb vs linear?
 			],
@@ -151,10 +145,12 @@ pub mod vert_rect {
             layout (location = 1) in uint in_dim;
             layout (location = 2) in uint in_color;
             layout (location = 3) in uint in_color2;
-            layout (location = 4) in uint corner_radius_gradient_srgb;
+            layout (location = 4) in uint round_unused_gradient_srgb;
             layout (location = 5) in float depth;
 
             layout (location = 0) out vec4 out_color;
+            layout (location = 1) out vec2 out_uv;
+            layout (location = 2) out float out_radius;
 
             layout (set = 0, binding = 0) uniform UniformParams {
                 uniform uvec2 screen_resolution;
@@ -176,6 +172,8 @@ pub mod vert_rect {
 							uint v = uint(gl_VertexIndex);
 
 							uvec2 corner_position = uvec2(v & 1u, (v >> 1u) & 1u);
+							out_uv = vec2(corner_position);
+
 							uvec2 corner_offset = uvec2(width, height) * corner_position;
 							pos = pos + ivec2(corner_offset);
 
@@ -185,9 +183,9 @@ pub mod vert_rect {
 								1.0
 							);
 
-              uint corner_radius = corner_radius_gradient_srgb & 0xffu;
+              out_radius = float(round_unused_gradient_srgb & 0xffu) / 255.0;
 
-							uint gradient_mode = (corner_radius_gradient_srgb & 0x00ff0000u) >> 16;
+							uint gradient_mode = (round_unused_gradient_srgb & 0x00ff0000u) >> 16;
 
 							uint color;
 							switch (gradient_mode) {
@@ -204,7 +202,7 @@ pub mod vert_rect {
 									break;
 			        }
 
-              uint srgb = (corner_radius_gradient_srgb & 0xff000000u) >> 24;
+              uint srgb = (round_unused_gradient_srgb & 0xff000000u) >> 24;
 
               if (srgb == 0u) {
 							  out_color = vec4(
@@ -233,16 +231,22 @@ pub mod frag_rect {
             precision highp float;
 
             layout (location = 0) in vec4 in_color;
+            layout (location = 1) in vec2 in_uv;
+            layout (location = 2) in float in_radius;
 
             layout (location = 0) out vec4 out_color;
-
-            layout (set = 0, binding = 0) uniform UniformParams {
-                uniform uvec2 screen_resolution;
-            };
 
             void main()
             {
 								out_color = in_color;
+
+                vec2 uv_circ = ((1. - in_radius) - (abs(in_uv + vec2(-0.5)) * 2.))/in_radius;
+                float dist = length(uv_circ);
+
+                out_color.a = mix(out_color.a, 0.,
+                        float(dist > 1.)
+                        * float(uv_circ.x < 0.)
+                        * float(uv_circ.y < 0.));
             }
         ",
 	}

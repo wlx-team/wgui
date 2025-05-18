@@ -10,19 +10,19 @@
       </rectangle>
       <rectangle color="#226644" width="64" height="64" />
       <rectangle color="#001122" width="64" height="64" />
-      <rectangle color="#99AAFF" width="128" height="128" align_items="center" justify_content="center">
+      <rectangle color="#99AAFF" round="1.0" width="128" height="128" align_items="center" justify_content="center">
         <label text="I'm centered" color="#FF0000" weight="bold" />
       </rectangle>
       <label text="I'm a text!" color="#0000FF" />
       <label text="I'm a bold text!" color="#0000FF" weight="bold" />
       <label text="I'm a BIG text!" color="#0000FF" weight="bold" size="20" />
-      <rectangle width="400" height="300" id="my_div_parent" color="#FFCC99" align_items="center" align_content="flex_start" justify_content="center" flex_wrap="wrap" gap="8" padding="16">
+      <rectangle width="400" height="300" round="0.5" id="my_div_parent" color="#FFCC99" align_items="center" align_content="flex_start" justify_content="center" flex_wrap="wrap" gap="8" padding="16">
         <!-- filled-in at runtime -->
       </rectangle>
     </div>
     <!-- 2/3 green rects -->
     <div width="100%" height="100%" flex_direction="column">
-      <rectangle color="#44aa33" color2="#3344aa" gradient="horizontal" height="100%">
+      <rectangle color="#44aa33" color2="#3344aa" round="0.1" gradient="horizontal" height="100%">
         <div margin="16" width="100%" height="100%" align_items="center" justify_content="center" flex_wrap="wrap" align_content="center">
           <rectangle width="64" height="64" color="#000000" />
           <rectangle width="64" height="64" color="#002222" />
@@ -30,7 +30,7 @@
           <rectangle width="64" height="64" color="#006666" />
         </div>
       </rectangle>
-      <rectangle color="#aaff88" color2="#88aaff" gradient="vertical" height="100%">
+      <rectangle color="#aaff88" color2="#88aaff" round="0.1" gradient="vertical" height="100%">
         <div margin="16" width="100%" height="100%" flex_wrap="wrap" gap="16" align_content="flex_start">
           <rectangle width="64" height="32" color="#ff0000" />
           <rectangle width="64" height="32" color="#ff0000" />

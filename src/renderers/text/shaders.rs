@@ -99,10 +99,6 @@ pub mod frag_atlas {
             layout (set = 0, binding = 0) uniform sampler2D color_atlas;
             layout (set = 1, binding = 0) uniform sampler2D mask_atlas;
 
-            layout (set = 2, binding = 0) uniform UniformParams {
-                uniform uvec2 screen_resolution;
-            };
-
             void main()
             {
 						  if (content_type == 0u) {

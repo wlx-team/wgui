@@ -348,8 +348,8 @@ fn parse_widget_rectangle<'a>(
 					}
 				}
 			}
-			"radius" => {
-				params.radius = value.parse().unwrap_or_else(|_| {
+			"round" => {
+				params.round = value.parse().unwrap_or_else(|_| {
 					print_invalid_attrib(key, value);
 					0.0
 				});
