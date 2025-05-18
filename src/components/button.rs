@@ -36,7 +36,7 @@ pub struct Button {
 
 pub fn construct(layout: &mut Layout, parent: WidgetID, params: Params) -> anyhow::Result<Button> {
 	// simulate a border because we don't have it yet
-	let outer_border = layout.add_child(
+	let (outer_border, _) = layout.add_child(
 		parent,
 		Rectangle::new(RectangleParams::default())?,
 		taffy::Style {
@@ -49,7 +49,7 @@ pub fn construct(layout: &mut Layout, parent: WidgetID, params: Params) -> anyho
 		},
 	)?;
 
-	let inner_bg = layout.add_child(
+	let (inner_bg, _) = layout.add_child(
 		outer_border,
 		Rectangle::new(RectangleParams {
 			color: params.color,
@@ -89,15 +89,15 @@ pub fn construct(layout: &mut Layout, parent: WidgetID, params: Params) -> anyho
 		},
 	)?;
 
-	let widget = layout.widgets.get_mut(inner_bg).unwrap();
+	let mut widget = layout.widget_states.get(inner_bg).unwrap().lock().unwrap();
+	let state = widget.state_mut();
 
-	widget.add_event_listener(EventListener::MouseEnter(Box::new(|data| {
+	state.add_event_listener(EventListener::MouseEnter(Box::new(|_data| {
 		// TODO: modify widget state somehow?
-		let _rect = Layout::get_widget_as::<Rectangle>(&data.widgets, data.widget_id);
 		println!("mouse enter");
 	})));
 
-	widget.add_event_listener(EventListener::MouseLeave(Box::new(|_data| {
+	state.add_event_listener(EventListener::MouseLeave(Box::new(|_data| {
 		println!("mouse leave");
 	})));
 

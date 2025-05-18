@@ -301,12 +301,12 @@ fn parse_widget_div<'a>(
 	node: roxmltree::Node<'a, 'a>,
 	parent_id: WidgetID,
 ) -> anyhow::Result<()> {
-	let new_widget_id = ctx
+	let (new_id, _) = ctx
 		.layout
 		.add_child(parent_id, Div::new()?, style_from_node(node))?;
 
-	parse_universal(ctx, node, new_widget_id)?;
-	parse_children(ctx, node, new_widget_id)?;
+	parse_universal(ctx, node, new_id)?;
+	parse_children(ctx, node, new_id)?;
 
 	Ok(())
 }
@@ -358,13 +358,13 @@ fn parse_widget_rectangle<'a>(
 		}
 	}
 
-	let new_widget_id =
+	let (new_id, _) =
 		ctx
 			.layout
 			.add_child(parent_id, Rectangle::new(params)?, style_from_node(node))?;
 
-	parse_universal(ctx, node, new_widget_id)?;
-	parse_children(ctx, node, new_widget_id)?;
+	parse_universal(ctx, node, new_id)?;
+	parse_children(ctx, node, new_id)?;
 
 	Ok(())
 }
@@ -417,13 +417,13 @@ fn parse_widget_label<'a>(
 		}
 	}
 
-	let new_widget_id =
+	let (new_id, _) =
 		ctx
 			.layout
 			.add_child(parent_id, TextLabel::new(params)?, style_from_node(node))?;
 
-	parse_universal(ctx, node, new_widget_id)?;
-	parse_children(ctx, node, new_widget_id)?;
+	parse_universal(ctx, node, new_id)?;
+	parse_children(ctx, node, new_id)?;
 
 	Ok(())
 }

@@ -1,9 +1,11 @@
+use std::sync::{Arc, Mutex};
+
 use crate::{
 	drawing::{self},
 	renderers::text::{RenderableText, TextStyle},
 };
 
-use super::{Widget, WidgetData};
+use super::{Widget, WidgetState};
 
 #[derive(Default)]
 pub struct TextParams {
@@ -12,25 +14,25 @@ pub struct TextParams {
 }
 
 pub struct TextLabel {
-	data: WidgetData,
+	data: WidgetState,
 	params: TextParams,
 }
 
 impl TextLabel {
-	pub fn new(params: TextParams) -> anyhow::Result<Box<Self>> {
-		Ok(Box::new(Self {
-			data: WidgetData::new()?,
+	pub fn new(params: TextParams) -> anyhow::Result<Arc<Mutex<Self>>> {
+		Ok(Arc::new(Mutex::new(Self {
+			data: WidgetState::new()?,
 			params,
-		}))
+		})))
 	}
 }
 
 impl Widget for TextLabel {
-	fn data_mut(&mut self) -> &mut WidgetData {
+	fn state_mut(&mut self) -> &mut WidgetState {
 		&mut self.data
 	}
 
-	fn data(&self) -> &WidgetData {
+	fn state(&self) -> &WidgetState {
 		&self.data
 	}
 

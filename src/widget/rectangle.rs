@@ -1,8 +1,10 @@
+use std::sync::{Arc, Mutex};
+
 use taffy::Size;
 
 use crate::drawing::{self, GradientMode};
 
-use super::{Widget, WidgetData};
+use super::{Widget, WidgetState};
 
 #[derive(Default)]
 pub struct RectangleParams {
@@ -13,25 +15,25 @@ pub struct RectangleParams {
 }
 
 pub struct Rectangle {
-	data: WidgetData,
+	data: WidgetState,
 	params: RectangleParams,
 }
 
 impl Rectangle {
-	pub fn new(params: RectangleParams) -> anyhow::Result<Box<Self>> {
-		Ok(Box::new(Self {
-			data: WidgetData::new()?,
+	pub fn new(params: RectangleParams) -> anyhow::Result<Arc<Mutex<Self>>> {
+		Ok(Arc::new(Mutex::new(Self {
+			data: WidgetState::new()?,
 			params,
-		}))
+		})))
 	}
 }
 
 impl Widget for Rectangle {
-	fn data_mut(&mut self) -> &mut WidgetData {
+	fn state_mut(&mut self) -> &mut WidgetState {
 		&mut self.data
 	}
 
-	fn data(&self) -> &WidgetData {
+	fn state(&self) -> &WidgetState {
 		&self.data
 	}
 

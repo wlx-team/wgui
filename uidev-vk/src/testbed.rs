@@ -18,7 +18,7 @@ impl Testbed {
 		let mut layout = Layout::new()?;
 
 		use wgui::components::button;
-		let parent = layout.root;
+		let parent = layout.root_widget;
 
 		let res = wgui::parser::parse(
 			&mut layout,

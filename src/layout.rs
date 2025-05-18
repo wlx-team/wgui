@@ -1,3 +1,8 @@
+use std::{
+	collections::HashMap,
+	sync::{Arc, Mutex},
+};
+
 use crate::{
 	event::{self, CallbackData, Event, EventListener},
 	transform_stack::{Transform, TransformStack},
@@ -7,55 +12,42 @@ use crate::{
 use super::widget::{Widget, div::Div};
 use glam::Vec2;
 use slotmap::HopSlotMap;
-use taffy::TaffyTree;
+use taffy::{TaffyTree, TraversePartialTree};
 
 pub type WidgetID = slotmap::DefaultKey;
-pub type BoxWidget = Box<dyn Widget>;
-pub type WidgetMap = HopSlotMap<slotmap::DefaultKey, BoxWidget>;
+pub type BoxWidget = Arc<Mutex<dyn Widget>>;
+pub type WidgetStateMap = HopSlotMap<slotmap::DefaultKey, BoxWidget>;
 
 pub struct Layout {
 	pub tree: TaffyTree<WidgetID>,
-	pub widgets: WidgetMap,
-	pub root: WidgetID,
+
+	pub widget_states: WidgetStateMap,
+	pub widget_node_map: HashMap<WidgetID, taffy::NodeId>,
+
+	pub root_widget: WidgetID,
+	pub root_node: taffy::NodeId,
 
 	pub prev_size: Vec2,
 }
 
 fn add_child_internal(
 	tree: &mut taffy::TaffyTree<WidgetID>,
-	vec: &mut WidgetMap,
-	parent_widget: Option<WidgetID>,
+	widget_node_map: &mut HashMap<WidgetID, taffy::NodeId>,
+	vec: &mut WidgetStateMap,
 	parent_node: Option<taffy::NodeId>,
-	mut child: BoxWidget,
+	child: BoxWidget,
 	style: taffy::Style,
-) -> anyhow::Result<WidgetID> {
-	let child_node = tree.new_leaf(style)?;
+) -> anyhow::Result<(WidgetID, taffy::NodeId)> {
+	let child_id = vec.insert(child);
+	let child_node = tree.new_leaf_with_context(style, child_id)?;
+
 	if let Some(parent_node) = parent_node {
 		tree.add_child(parent_node, child_node)?;
 	}
 
-	let child_id = vec.insert_with_key(|child_id| {
-		let child_data = child.data_mut();
-		child_data.node = child_node;
+	widget_node_map.insert(child_id, child_node);
 
-		if let Some(parent_widget) = parent_widget {
-			child_data.parent = parent_widget;
-		}
-
-		tree.set_node_context(child_node, Some(child_id)).unwrap();
-
-		child
-	});
-
-	if let Some(parent_widget) = parent_widget {
-		let Some(parent_widget) = vec.get_mut(parent_widget) else {
-			panic!("parent widget is invalid");
-		};
-
-		parent_widget.data_mut().children.push(child_id);
-	}
-
-	Ok(child_id)
+	Ok((child_id, child_node))
 }
 
 impl Layout {
@@ -64,39 +56,52 @@ impl Layout {
 		parent_widget_id: WidgetID,
 		widget: BoxWidget,
 		style: taffy::Style,
-	) -> anyhow::Result<WidgetID> {
-		let Some(parent_widget) = self.widgets.get(parent_widget_id) else {
+	) -> anyhow::Result<(WidgetID, taffy::NodeId)> {
+		let Some(parent_node) = self.widget_node_map.get(&parent_widget_id).cloned() else {
 			anyhow::bail!("invalid parent widget");
 		};
 
-		let parent_node = parent_widget.data().node;
-
-		let child_id = add_child_internal(
+		add_child_internal(
 			&mut self.tree,
-			&mut self.widgets,
-			Some(parent_widget_id),
+			&mut self.widget_node_map,
+			&mut self.widget_states,
 			Some(parent_node),
 			widget,
 			style,
-		)?;
+		)
+	}
 
-		Ok(child_id)
+	fn push_event_children(
+		&self,
+		parent_node_id: taffy::NodeId,
+		transform_stack: &mut TransformStack,
+		event: &event::Event,
+	) -> anyhow::Result<()> {
+		for child_id in self.tree.child_ids(parent_node_id) {
+			self.push_event_widget(transform_stack, child_id, event)?;
+		}
+
+		Ok(())
 	}
 
 	fn push_event_widget(
-		widgets: &WidgetMap,
-		tree: &mut taffy::TaffyTree<WidgetID>,
+		&self,
 		transform_stack: &mut TransformStack,
-		widget_id: WidgetID,
+		node_id: taffy::NodeId,
 		event: &event::Event,
 	) -> anyhow::Result<()> {
-		let Some(widget) = widgets.get(widget_id) else {
+		let l = self.tree.layout(node_id)?;
+		let Some(widget_id) = self.tree.get_node_context(node_id).cloned() else {
+			anyhow::bail!("invalid widget ID");
+		};
+
+		let Some(widget) = self.widget_states.get(widget_id) else {
 			debug_assert!(false);
 			anyhow::bail!("invalid widget");
 		};
 
-		let data = widget.data();
-		let l = tree.layout(data.node)?;
+		let mut widget = widget.lock().unwrap();
+		let state = widget.state_mut();
 
 		let transform = Transform {
 			pos: Vec2::new(l.location.x, l.location.y),
@@ -107,13 +112,14 @@ impl Layout {
 
 		let mut iter_children = true;
 
-		match widget.process_event(
+		match state.process_event(
 			widget_id,
+			node_id,
 			event,
 			&mut EventParams {
 				transform_stack,
-				widgets,
-				tree,
+				widgets: &self.widget_states,
+				tree: &self.tree,
 			},
 		) {
 			widget::EventResult::Pass => {
@@ -127,10 +133,10 @@ impl Layout {
 			}
 		}
 
+		drop(widget); // free mutex
+
 		if iter_children {
-			for child in &data.children {
-				Layout::push_event_widget(widgets, tree, transform_stack, *child, event)?;
-			}
+			self.push_event_children(node_id, transform_stack, event)?;
 		}
 
 		transform_stack.pop();
@@ -138,40 +144,22 @@ impl Layout {
 		Ok(())
 	}
 
-	pub fn get_widget_as<T: 'static>(widgets: &WidgetMap, id: WidgetID) -> &T {
-		let widget = widgets.get(id).unwrap();
-		let any = (**widget).as_any();
-		any.downcast_ref::<T>().unwrap()
-	}
-
-	pub fn get_widget_as_mut<T: 'static>(widgets: &mut WidgetMap, id: WidgetID) -> &T {
-		let widget = widgets.get_mut(id).unwrap();
-		let any = (**widget).as_any_mut();
-		any.downcast_mut::<T>().unwrap()
-	}
-
 	pub fn push_event(&mut self, event: &event::Event) -> anyhow::Result<()> {
 		let mut transform_stack = TransformStack::new();
-		Layout::push_event_widget(
-			&self.widgets,
-			&mut self.tree,
-			&mut transform_stack,
-			self.root,
-			event,
-		)?;
+		self.push_event_widget(&mut transform_stack, self.root_node, event)?;
 		Ok(())
 	}
 
 	pub fn new() -> anyhow::Result<Self> {
 		let mut tree = TaffyTree::new();
+		let mut widget_node_map = HashMap::new();
+		let mut widget_states = HopSlotMap::new();
 
-		let mut widgets = HopSlotMap::new();
-
-		let root = add_child_internal(
+		let (root_widget, root_node) = add_child_internal(
 			&mut tree,
-			&mut widgets,
-			None, /* no parent widget */
-			None, /* no parent node */
+			&mut widget_node_map,
+			&mut widget_states,
+			None, // no parent
 			Div::new()?,
 			taffy::Style {
 				size: taffy::Size::percent(1.0),
@@ -181,20 +169,20 @@ impl Layout {
 
 		Ok(Self {
 			tree,
-			widgets,
-			root,
 			prev_size: Vec2::default(),
+			root_node,
+			root_widget,
+			widget_node_map,
+			widget_states,
 		})
 	}
 
 	pub fn update(&mut self, size: Vec2) -> anyhow::Result<()> {
-		let root_node = self.widgets.get(self.root).unwrap().data().node;
-
-		if self.tree.dirty(root_node)? || self.prev_size != size {
+		if self.tree.dirty(self.root_node)? || self.prev_size != size {
 			println!("re-computing layout, size {}x{}", size.x, size.y);
 			self.prev_size = size;
 			self.tree.compute_layout(
-				root_node,
+				self.root_node,
 				taffy::Size {
 					width: taffy::AvailableSpace::Definite(size.x),
 					height: taffy::AvailableSpace::Definite(size.y),

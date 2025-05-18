@@ -6,7 +6,7 @@ use super::drawing::RenderPrimitive;
 use crate::{
 	any::AnyTrait,
 	event::{CallbackData, Event, EventListener},
-	layout::{Layout, WidgetID, WidgetMap},
+	layout::{Layout, WidgetID, WidgetStateMap},
 	transform_stack::TransformStack,
 };
 
@@ -21,35 +21,25 @@ pub struct WidgetState {
 	pub event_listeners: Vec<EventListener>,
 }
 
-pub struct WidgetData {
-	pub node: taffy::NodeId,
-	pub children: Vec<WidgetID>,
-	pub parent: WidgetID,
-
-	pub state: Rc<RefCell<WidgetState>>,
-}
-
-impl WidgetData {
-	fn new() -> anyhow::Result<WidgetData> {
+impl WidgetState {
+	fn new() -> anyhow::Result<WidgetState> {
 		Ok(Self {
-			children: Vec::new(),
-			parent: WidgetID::null(),    // Unset by default
-			node: taffy::NodeId::new(0), // Unset by default
-			state: Rc::new(RefCell::new(WidgetState::default())),
+			hovered: false,
+			pressed: false,
+			event_listeners: Vec::new(),
 		})
 	}
 }
 
 pub struct DrawParams<'a> {
-	pub current_widget: WidgetID,
 	pub layout: &'a Layout,
 	pub primitives: &'a mut Vec<RenderPrimitive>,
 	pub transform_stack: &'a mut TransformStack,
 }
 
 pub trait Widget: AnyTrait {
-	fn data(&self) -> &WidgetData;
-	fn data_mut(&mut self) -> &mut WidgetData;
+	fn state(&self) -> &WidgetState;
+	fn state_mut(&mut self) -> &mut WidgetState;
 	fn draw(&self, params: &mut DrawParams);
 	fn measure(
 		&mut self,
@@ -59,8 +49,8 @@ pub trait Widget: AnyTrait {
 }
 
 pub struct EventParams<'a> {
-	pub widgets: &'a WidgetMap,
-	pub tree: &'a mut taffy::TaffyTree<WidgetID>,
+	pub widgets: &'a WidgetStateMap,
+	pub tree: &'a taffy::TaffyTree<WidgetID>,
 	pub transform_stack: &'a TransformStack,
 }
 
@@ -70,34 +60,29 @@ pub enum EventResult {
 	Outside,
 }
 
-impl dyn Widget {
+impl WidgetState {
 	pub fn add_event_listener(&mut self, listener: EventListener) {
-		self
-			.data_mut()
-			.state
-			.borrow_mut()
-			.event_listeners
-			.push(listener);
+		self.event_listeners.push(listener);
 	}
 
 	pub fn process_event(
-		&self,
+		&mut self,
 		widget_id: WidgetID,
+		node_id: taffy::NodeId,
 		event: &Event,
 		params: &mut EventParams,
 	) -> EventResult {
 		let hovered = event.test_mouse_within_transform(params.transform_stack.get());
-		let mut state = self.data().state.borrow_mut();
 
 		match &event {
 			Event::MouseDown(_) => {
 				if hovered {
-					state.pressed = true;
+					self.pressed = true;
 				}
 			}
 			Event::MouseUp(_) => {
-				if state.pressed {
-					state.pressed = false;
+				if self.pressed {
+					self.pressed = false;
 				}
 			}
 			_ => {}
@@ -106,33 +91,34 @@ impl dyn Widget {
 		let mut just_clicked = false;
 		match &event {
 			Event::MouseDown(_) => {
-				if state.hovered {
-					state.pressed = true;
+				if self.hovered {
+					self.pressed = true;
 				}
 			}
 			Event::MouseUp(_) => {
-				if state.pressed {
-					state.pressed = false;
-					just_clicked = state.hovered;
+				if self.pressed {
+					self.pressed = false;
+					just_clicked = self.hovered;
 				}
 			}
 			_ => {}
 		}
 
 		let callback_data = CallbackData {
-			widgets: &params.widgets,
+			widgets: params.widgets,
 			widget_id,
+			node_id,
 		};
 
-		for listener in &state.event_listeners {
+		for listener in &self.event_listeners {
 			match listener {
 				EventListener::MouseEnter(callback) => {
-					if hovered && !state.hovered {
+					if hovered && !self.hovered {
 						callback(&callback_data);
 					}
 				}
 				EventListener::MouseLeave(callback) => {
-					if !hovered && !state.hovered {
+					if !hovered && !self.hovered {
 						callback(&callback_data);
 					}
 				}
@@ -144,8 +130,8 @@ impl dyn Widget {
 			}
 		}
 
-		if state.hovered != hovered {
-			state.hovered = hovered;
+		if self.hovered != hovered {
+			self.hovered = hovered;
 			EventResult::Pass
 		} else if hovered {
 			EventResult::Pass

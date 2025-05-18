@@ -3,7 +3,7 @@ use std::rc::Rc;
 use glam::Vec2;
 
 use crate::{
-	layout::{Layout, WidgetID, WidgetMap},
+	layout::{Layout, WidgetID, WidgetStateMap},
 	transform_stack::Transform,
 	widget::Widget,
 };
@@ -45,8 +45,9 @@ impl Event {
 }
 
 pub struct CallbackData<'a> {
-	pub widgets: &'a WidgetMap,
+	pub widgets: &'a WidgetStateMap,
 	pub widget_id: WidgetID,
+	pub node_id: taffy::NodeId,
 }
 
 pub type MouseEnterCallback = Box<dyn Fn(&CallbackData)>;

@@ -1,7 +1,8 @@
 use glam::Vec2;
+use taffy::TraversePartialTree;
 
 use crate::{
-	layout::BoxWidget,
+	layout::{BoxWidget, WidgetID},
 	renderers::text::RenderableText,
 	transform_stack::{Transform, TransformStack},
 };
@@ -71,8 +72,13 @@ pub enum RenderPrimitive {
 	Image(Boundary, Image),
 }
 
-fn draw_children(layout: &Layout, params: &mut DrawParams, widget: &BoxWidget) {
-	let Ok(l) = layout.tree.layout(widget.data().node) else {
+fn draw_widget(
+	layout: &Layout,
+	params: &mut DrawParams,
+	node_id: taffy::NodeId,
+	widget: &BoxWidget,
+) {
+	let Ok(l) = layout.tree.layout(node_id) else {
 		debug_assert!(false);
 		return;
 	};
@@ -82,37 +88,44 @@ fn draw_children(layout: &Layout, params: &mut DrawParams, widget: &BoxWidget) {
 		dim: Vec2::new(l.size.width, l.size.height),
 	});
 
-	widget.draw(params);
+	widget.lock().unwrap().draw(params);
 
-	for child_id in widget.data().children.iter() {
-		let Some(child) = layout.widgets.get(*child_id) else {
-			println!("warning: skipping invalid widget id");
-			continue;
-		};
-
-		params.current_widget = *child_id;
-		draw_children(layout, params, child);
-	}
+	draw_children(layout, params, node_id);
 
 	params.transform_stack.pop();
 }
 
-pub fn draw(layout: &Layout) -> anyhow::Result<Vec<RenderPrimitive>> {
-	let Some(root) = layout.widgets.get(layout.root) else {
-		panic!("root widget doesn't exist"); // This shouldn't happen
-	};
+fn draw_children(layout: &Layout, params: &mut DrawParams, parent_node_id: taffy::NodeId) {
+	for node_id in layout.tree.child_ids(parent_node_id) {
+		let Some(widget_id) = layout.tree.get_node_context(node_id).cloned() else {
+			debug_assert!(false);
+			continue;
+		};
 
+		let Some(widget) = layout.widget_states.get(widget_id) else {
+			debug_assert!(false);
+			continue;
+		};
+
+		draw_widget(layout, params, node_id, widget);
+	}
+}
+
+pub fn draw(layout: &Layout) -> anyhow::Result<Vec<RenderPrimitive>> {
 	let mut primitives = Vec::<RenderPrimitive>::new();
 	let mut transform_stack = TransformStack::new();
 
 	let mut params = DrawParams {
-		current_widget: layout.root,
 		primitives: &mut primitives,
 		transform_stack: &mut transform_stack,
 		layout,
 	};
 
-	draw_children(layout, &mut params, root);
+	let Some(root_widget) = layout.widget_states.get(layout.root_widget) else {
+		panic!("root widget doesn't exist"); // This shouldn't happen
+	};
+
+	draw_widget(layout, &mut params, layout.root_node, root_widget);
 
 	Ok(primitives)
 }
