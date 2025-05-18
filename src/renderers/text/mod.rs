@@ -1,9 +1,7 @@
 mod custom_glyph;
-mod error;
-pub mod shaders;
+mod shaders;
 pub mod text_atlas;
 pub mod text_renderer;
-pub mod viewport;
 
 use std::sync::{LazyLock, Mutex};
 
@@ -114,7 +112,6 @@ impl RenderableText {
 	}
 }
 
-#[allow(dead_code)]
 #[derive(Default, Clone)]
 pub struct TextStyle {
 	pub size: Option<f32>,
@@ -239,7 +236,7 @@ impl From<cosmic_text::Color> for drawing::Color {
 
 // glyphon types below
 
-pub(crate) enum GpuCacheStatus {
+pub(super) enum GpuCacheStatus {
 	InAtlas {
 		x: u16,
 		y: u16,
@@ -248,7 +245,7 @@ pub(crate) enum GpuCacheStatus {
 	SkipRasterization,
 }
 
-pub(crate) struct GlyphDetails {
+pub(super) struct GlyphDetails {
 	width: u16,
 	height: u16,
 	gpu_cache: GpuCacheStatus,

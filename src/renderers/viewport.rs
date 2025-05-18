@@ -5,39 +5,61 @@ use vulkano::{
 	descriptor_set::DescriptorSet,
 };
 
-use super::text_atlas::TextResources;
+use crate::gfx::WGfx;
+
+use super::{rect::RectPipeline, text::text_atlas::TextPipeline};
 
 /// Controls the visible area of all text for a given renderer. Any text outside of the visible
 /// area will be clipped.
-///
-/// Many projects will only ever need a single `Viewport`, but it is possible to create multiple
-/// `Viewport`s if you want to render text to specific areas within a window (without having to)
-/// bound each `TextArea`).
 pub struct Viewport {
 	params: Params,
 	params_buffer: Subbuffer<[Params]>,
-	pub params_descriptor: Arc<DescriptorSet>,
+	text_descriptor: Option<Arc<DescriptorSet>>,
+	rect_descriptor: Option<Arc<DescriptorSet>>,
 }
 
 impl Viewport {
 	/// Creates a new `Viewport` with the given `device` and `cache`.
-	pub fn new(common: TextResources) -> anyhow::Result<Self> {
+	pub fn new(gfx: WGfx) -> anyhow::Result<Self> {
 		let params = Params {
 			screen_resolution: [0, 0],
 		};
 
-		let params_buffer = common.gfx.new_buffer(
+		let params_buffer = gfx.new_buffer(
 			BufferUsage::UNIFORM_BUFFER | BufferUsage::TRANSFER_DST,
 			[params].iter(),
 		)?;
 
-		let params_descriptor = common.pipeline.uniform_buffer(2, params_buffer.clone())?;
-
 		Ok(Self {
 			params,
 			params_buffer,
-			params_descriptor,
+			text_descriptor: None,
+			rect_descriptor: None,
 		})
+	}
+
+	pub fn get_text_descriptor(&mut self, pipeline: &TextPipeline) -> Arc<DescriptorSet> {
+		self
+			.text_descriptor
+			.get_or_insert_with(|| {
+				pipeline
+					.inner
+					.uniform_buffer(2, self.params_buffer.clone())
+					.unwrap() // safe unwrap
+			})
+			.clone()
+	}
+
+	pub fn get_rect_descriptor(&mut self, pipeline: &RectPipeline) -> Arc<DescriptorSet> {
+		self
+			.rect_descriptor
+			.get_or_insert_with(|| {
+				pipeline
+					.color_rect
+					.uniform_buffer(0, self.params_buffer.clone())
+					.unwrap() // safe unwrap
+			})
+			.clone()
 	}
 
 	/// Updates the `Viewport` with the given `resolution`.

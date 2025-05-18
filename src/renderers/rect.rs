@@ -8,10 +8,10 @@ use vulkano::{
 
 use crate::{
 	drawing::{Boundary, Rectangle},
-	wgfx::{BLEND_ALPHA, GfxCommandBuffer, WGfx, WGfxPipeline},
+	gfx::{BLEND_ALPHA, WGfx, cmd::GfxCommandBuffer, pipeline::WGfxPipeline},
 };
 
-use super::text::viewport::{Params, Viewport};
+use super::viewport::Viewport;
 
 #[repr(C)]
 #[derive(BufferContents, Vertex, Copy, Clone, Debug)]
@@ -30,20 +30,19 @@ pub struct RectVertex {
 	pub depth: f32,
 }
 
-pub struct RectRenderer {
+/// Cloneable pipeline & shaders to be shared between RectRenderer instances.
+#[derive(Clone)]
+pub struct RectPipeline {
 	gfx: Arc<WGfx>,
-	pipeline_color_rect: Arc<WGfxPipeline<RectVertex>>,
-	rect_vertices: Vec<RectVertex>,
-	vert_buffer: Subbuffer<[RectVertex]>,
-	vert_buffer_size: usize,
+	pub(super) color_rect: Arc<WGfxPipeline<RectVertex>>,
 }
 
-impl RectRenderer {
+impl RectPipeline {
 	pub fn new(gfx: Arc<WGfx>, format: Format) -> anyhow::Result<Self> {
 		let vert = vert_rect::load(gfx.device.clone())?;
 		let frag = frag_rect::load(gfx.device.clone())?;
 
-		let pipeline_color_rect = gfx.create_pipeline::<RectVertex>(
+		let color_rect = gfx.create_pipeline::<RectVertex>(
 			vert,
 			frag,
 			format,
@@ -52,16 +51,28 @@ impl RectRenderer {
 			true,
 		)?;
 
+		Ok(Self { gfx, color_rect })
+	}
+}
+
+pub struct RectRenderer {
+	pipeline: RectPipeline,
+	rect_vertices: Vec<RectVertex>,
+	vert_buffer: Subbuffer<[RectVertex]>,
+	vert_buffer_size: usize,
+}
+
+impl RectRenderer {
+	pub fn new(pipeline: RectPipeline) -> anyhow::Result<Self> {
 		const BUFFER_SIZE: usize = 128;
 
-		let vert_buffer = gfx.empty_buffer(
+		let vert_buffer = pipeline.gfx.empty_buffer(
 			BufferUsage::VERTEX_BUFFER | BufferUsage::TRANSFER_DST,
 			BUFFER_SIZE as _,
 		)?;
 
 		Ok(Self {
-			gfx,
-			pipeline_color_rect,
+			pipeline,
 			rect_vertices: vec![],
 			vert_buffer,
 			vert_buffer_size: BUFFER_SIZE,
@@ -93,7 +104,7 @@ impl RectRenderer {
 	fn upload_verts(&mut self) -> anyhow::Result<()> {
 		if self.vert_buffer_size < self.rect_vertices.len() {
 			let new_size = self.vert_buffer_size * 2;
-			self.vert_buffer = self.gfx.empty_buffer(
+			self.vert_buffer = self.pipeline.gfx.empty_buffer(
 				BufferUsage::VERTEX_BUFFER | BufferUsage::TRANSFER_DST,
 				new_size as _,
 			)?;
@@ -107,21 +118,16 @@ impl RectRenderer {
 
 	pub fn render(
 		&mut self,
-		viewport: &Viewport,
+		viewport: &mut Viewport,
 		cmd_buf: &mut GfxCommandBuffer,
 	) -> anyhow::Result<()> {
 		let vp = viewport.resolution();
 
+		let set0 = viewport.get_rect_descriptor(&self.pipeline);
+
 		self.upload_verts()?;
 
-		let set0 = self.pipeline_color_rect.uniform_buffer_upload(
-			0,
-			vec![Params {
-				screen_resolution: vp,
-			}],
-		)?;
-
-		let pass = self.pipeline_color_rect.create_pass_vertices(
+		let pass = self.pipeline.color_rect.create_pass_instanced(
 			[vp[0] as _, vp[1] as _],
 			self.vert_buffer.clone(),
 			0..4,

@@ -2,11 +2,11 @@ pub mod any;
 pub mod components;
 pub mod drawing;
 pub mod event;
+pub mod gfx;
 pub mod layout;
 pub mod parser;
 pub mod renderers;
 pub mod transform_stack;
-pub mod wgfx;
 pub mod widget;
 
 // re-exported libs

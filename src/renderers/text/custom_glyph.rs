@@ -62,7 +62,7 @@ pub struct RasterizedCustomGlyph {
 }
 
 impl RasterizedCustomGlyph {
-	pub(crate) fn validate(
+	pub(super) fn validate(
 		&self,
 		input: &RasterizeCustomGlyphRequest,
 		expected_type: Option<ContentType>,

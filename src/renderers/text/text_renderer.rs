@@ -1,11 +1,9 @@
-use crate::wgfx::GfxCommandBuffer;
+use crate::{gfx::cmd::GfxCommandBuffer, renderers::viewport::Viewport};
 
 use super::{
 	ContentType, FontSystem, GlyphDetails, GpuCacheStatus, SwashCache, TextArea,
 	custom_glyph::{CustomGlyphCacheKey, RasterizeCustomGlyphRequest, RasterizedCustomGlyph},
-	error::PrepareStatus,
-	text_atlas::{ColorMode, GlyphVertex, TextAtlas, TextResources},
-	viewport::Viewport,
+	text_atlas::{ColorMode, GlyphVertex, TextAtlas, TextPipeline},
 };
 use cosmic_text::{Color, SubpixelBin, SwashContent};
 use vulkano::{
@@ -15,7 +13,7 @@ use vulkano::{
 
 /// A text renderer that uses cached glyphs to render text into an existing render pass.
 pub struct TextRenderer {
-	common: TextResources,
+	pipeline: TextPipeline,
 	vertex_buffer: Subbuffer<[GlyphVertex]>,
 	vertex_buffer_capacity: usize,
 	glyph_vertices: Vec<GlyphVertex>,
@@ -24,7 +22,8 @@ pub struct TextRenderer {
 impl TextRenderer {
 	/// Creates a new `TextRenderer`.
 	pub fn new(atlas: &mut TextAtlas) -> anyhow::Result<Self> {
-		const INITIAL_CAPACITY: usize = 4096;
+		// A buffer element is a single quad with a glyph on it
+		const INITIAL_CAPACITY: usize = 256;
 
 		let vertex_buffer = atlas.common.gfx.empty_buffer(
 			BufferUsage::VERTEX_BUFFER | BufferUsage::TRANSFER_DST,
@@ -32,7 +31,7 @@ impl TextRenderer {
 		)?;
 
 		Ok(Self {
-			common: atlas.common.clone(),
+			pipeline: atlas.common.clone(),
 			vertex_buffer,
 			vertex_buffer_capacity: INITIAL_CAPACITY,
 			glyph_vertices: Vec::new(),
@@ -102,6 +101,7 @@ impl TextRenderer {
 	}
 
 	/// Prepares all of the provided text areas for rendering.
+	#[allow(clippy::too_many_arguments)]
 	pub fn prepare_with_depth_and_custom<'a>(
 		&mut self,
 		font_system: &mut FontSystem,
@@ -276,7 +276,7 @@ impl TextRenderer {
 
 		while self.vertex_buffer_capacity < vertices.len() {
 			let new_capacity = self.vertex_buffer_capacity * 2;
-			self.vertex_buffer = self.common.gfx.empty_buffer(
+			self.vertex_buffer = self.pipeline.gfx.empty_buffer(
 				BufferUsage::VERTEX_BUFFER | BufferUsage::TRANSFER_DST,
 				new_capacity as _,
 			)?;
@@ -291,7 +291,7 @@ impl TextRenderer {
 	pub fn render(
 		&self,
 		atlas: &TextAtlas,
-		viewport: &Viewport,
+		viewport: &mut Viewport,
 		cmd_buf: &mut GfxCommandBuffer,
 	) -> anyhow::Result<()> {
 		if self.glyph_vertices.is_empty() {
@@ -301,12 +301,12 @@ impl TextRenderer {
 		let descriptor_sets = vec![
 			atlas.color_atlas.image_descriptor.clone(),
 			atlas.mask_atlas.image_descriptor.clone(),
-			viewport.params_descriptor.clone(),
+			viewport.get_text_descriptor(&self.pipeline),
 		];
 
 		let res = viewport.resolution();
 
-		let pass = self.common.pipeline.create_pass_vertices(
+		let pass = self.pipeline.inner.create_pass_instanced(
 			[res[0] as _, res[1] as _],
 			self.vertex_buffer.clone(),
 			0..4,
@@ -326,7 +326,7 @@ enum TextColorConversion {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub(crate) enum GlyphonCacheKey {
+pub(super) enum GlyphonCacheKey {
 	Text(cosmic_text::CacheKey),
 	Custom(CustomGlyphCacheKey),
 }
@@ -344,6 +344,7 @@ struct GetGlyphImageResult {
 	data: Vec<u8>,
 }
 
+#[allow(clippy::too_many_arguments)]
 fn prepare_glyph<R>(
 	x: i32,
 	y: i32,
@@ -395,7 +396,11 @@ where
 							scale_factor,
 							&mut rasterize_custom_glyph,
 						)? {
-							Err(PrepareStatus::AtlasFull)?;
+							anyhow::bail!(
+								"Atlas full. atlas: {:?} cache_key: {:?}",
+								image.content_type,
+								cache_key
+							);
 						}
 
 						inner = atlas.inner_for_content_mut(image.content_type);

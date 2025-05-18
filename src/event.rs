@@ -1,11 +1,8 @@
-use std::rc::Rc;
-
 use glam::Vec2;
 
 use crate::{
-	layout::{Layout, WidgetID, WidgetStateMap},
+	layout::{WidgetID, WidgetStateMap},
 	transform_stack::Transform,
-	widget::Widget,
 };
 
 // TODO: mouse index

@@ -20,16 +20,16 @@ use super::{
 	shaders::{frag_atlas, vert_atlas},
 	text_renderer::GlyphonCacheKey,
 };
-use crate::wgfx::{BLEND_ALPHA, WGfx, WGfxPipeline};
+use crate::gfx::{BLEND_ALPHA, WGfx, pipeline::WGfxPipeline};
 
-/// A cache to share common resources between multiple text renderers.
+/// Pipeline & shaders to be reused between TextRenderer instances
 #[derive(Clone)]
-pub struct TextResources {
-	pub gfx: Arc<WGfx>,
-	pub pipeline: Arc<WGfxPipeline<GlyphVertex>>,
+pub struct TextPipeline {
+	pub(super) gfx: Arc<WGfx>,
+	pub(in super::super) inner: Arc<WGfxPipeline<GlyphVertex>>,
 }
 
-impl TextResources {
+impl TextPipeline {
 	pub fn new(gfx: Arc<WGfx>, format: Format) -> anyhow::Result<Self> {
 		let vert = vert_atlas::load(gfx.device.clone())?;
 		let frag = frag_atlas::load(gfx.device.clone())?;
@@ -43,7 +43,10 @@ impl TextResources {
 			true,
 		)?;
 
-		Ok(Self { gfx, pipeline })
+		Ok(Self {
+			gfx,
+			inner: pipeline,
+		})
 	}
 }
 
@@ -66,8 +69,7 @@ pub struct GlyphVertex {
 
 type Hasher = BuildHasherDefault<FxHasher>;
 
-#[allow(dead_code)]
-pub struct InnerAtlas {
+pub(super) struct InnerAtlas {
 	pub kind: Kind,
 	pub image_view: Arc<ImageView>,
 	pub image_descriptor: Arc<DescriptorSet>,
@@ -76,13 +78,13 @@ pub struct InnerAtlas {
 	pub glyph_cache: LruCache<GlyphonCacheKey, GlyphDetails, Hasher>,
 	pub glyphs_in_use: HashSet<GlyphonCacheKey, Hasher>,
 	pub max_texture_dimension_2d: u32,
-	common: TextResources,
+	common: TextPipeline,
 }
 
 impl InnerAtlas {
 	const INITIAL_SIZE: u32 = 256;
 
-	fn new(common: TextResources, kind: Kind) -> anyhow::Result<Self> {
+	fn new(common: TextPipeline, kind: Kind) -> anyhow::Result<Self> {
 		let max_texture_dimension_2d = common
 			.gfx
 			.device
@@ -108,7 +110,7 @@ impl InnerAtlas {
 
 		let image_view = ImageView::new_default(image).unwrap();
 
-		let image_descriptor = common.pipeline.uniform_sampler(
+		let image_descriptor = common.inner.uniform_sampler(
 			Self::descriptor_set(kind),
 			image_view.clone(),
 			Filter::Nearest,
@@ -137,7 +139,7 @@ impl InnerAtlas {
 		}
 	}
 
-	pub(crate) fn try_allocate(&mut self, width: usize, height: usize) -> Option<Allocation> {
+	pub(super) fn try_allocate(&mut self, width: usize, height: usize) -> Option<Allocation> {
 		let size = size2(width as i32, height as i32);
 
 		loop {
@@ -176,7 +178,7 @@ impl InnerAtlas {
 		self.kind.num_channels()
 	}
 
-	pub(crate) fn grow(
+	pub(super) fn grow(
 		&mut self,
 		font_system: &mut FontSystem,
 		cache: &mut SwashCache,
@@ -197,7 +199,7 @@ impl InnerAtlas {
 		let image = self.common.gfx.new_image(
 			new_size,
 			new_size,
-			self.common.pipeline.format,
+			self.common.inner.format,
 			ImageUsage::SAMPLED | ImageUsage::TRANSFER_DST,
 		)?;
 
@@ -287,7 +289,7 @@ impl InnerAtlas {
 	}
 
 	fn rebind_descriptor(&mut self) -> anyhow::Result<()> {
-		self.image_descriptor = self.common.pipeline.uniform_sampler(
+		self.image_descriptor = self.common.inner.uniform_sampler(
 			Self::descriptor_set(self.kind),
 			self.image_view.clone(),
 			Filter::Nearest,
@@ -297,7 +299,7 @@ impl InnerAtlas {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(crate) enum Kind {
+pub(super) enum Kind {
 	Mask,
 	Color { srgb: bool },
 }
@@ -356,20 +358,20 @@ pub enum ColorMode {
 
 /// An atlas containing a cache of rasterized glyphs that can be rendered.
 pub struct TextAtlas {
-	pub(super) common: TextResources,
-	pub color_atlas: InnerAtlas,
-	pub mask_atlas: InnerAtlas,
+	pub(super) common: TextPipeline,
+	pub(super) color_atlas: InnerAtlas,
+	pub(super) mask_atlas: InnerAtlas,
 	pub(super) color_mode: ColorMode,
 }
 
 impl TextAtlas {
 	/// Creates a new [`TextAtlas`].
-	pub fn new(common: TextResources) -> anyhow::Result<Self> {
+	pub fn new(common: TextPipeline) -> anyhow::Result<Self> {
 		Self::with_color_mode(common, ColorMode::Accurate)
 	}
 
 	/// Creates a new [`TextAtlas`] with the given [`ColorMode`].
-	pub fn with_color_mode(common: TextResources, color_mode: ColorMode) -> anyhow::Result<Self> {
+	pub fn with_color_mode(common: TextPipeline, color_mode: ColorMode) -> anyhow::Result<Self> {
 		let color_atlas = InnerAtlas::new(
 			common.clone(),
 			Kind::Color {
@@ -394,7 +396,7 @@ impl TextAtlas {
 		self.color_atlas.trim();
 	}
 
-	pub(crate) fn grow(
+	pub(super) fn grow(
 		&mut self,
 		font_system: &mut FontSystem,
 		cache: &mut SwashCache,
@@ -423,7 +425,7 @@ impl TextAtlas {
 		Ok(did_grow)
 	}
 
-	pub(crate) fn inner_for_content_mut(&mut self, content_type: ContentType) -> &mut InnerAtlas {
+	pub(super) fn inner_for_content_mut(&mut self, content_type: ContentType) -> &mut InnerAtlas {
 		match content_type {
 			ContentType::Color => &mut self.color_atlas,
 			ContentType::Mask => &mut self.mask_atlas,

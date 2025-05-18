@@ -2,7 +2,7 @@ use glam::Vec2;
 use taffy::TraversePartialTree;
 
 use crate::{
-	layout::{BoxWidget, WidgetID},
+	layout::BoxWidget,
 	renderers::text::RenderableText,
 	transform_stack::{Transform, TransformStack},
 };
