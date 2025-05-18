@@ -23,7 +23,7 @@ impl Rectangle {
 }
 
 impl WidgetObj for Rectangle {
-	fn draw(&self, params: &mut super::DrawParams) {
+	fn draw(&mut self, params: &mut super::DrawParams) {
 		params.primitives.push(drawing::RenderPrimitive::Rectangle(
 			drawing::Boundary::construct(params.transform_stack),
 			drawing::Rectangle {

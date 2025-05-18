@@ -1,10 +1,12 @@
 use wgui::{
 	cosmic_text::Color,
 	drawing::{self, RenderPrimitive},
+	event::EventListener,
 	gfx::cmd::GfxCommandBuffer,
 	glam::Vec2,
 	layout::Layout,
-	renderers::text::{FONT_SYSTEM, SWASH_CACHE, TextArea, TextBounds},
+	renderers::text::{FONT_SYSTEM, SWASH_CACHE, TextArea, TextBounds, TextStyle},
+	widget::text::TextLabel,
 };
 
 use crate::Goodies;
@@ -37,9 +39,33 @@ impl Testbed {
 				button::Params {
 					text: "I'm a button!",
 					color: drawing::Color::new(1.0 - n, n * n, n, 1.0),
+					..Default::default()
 				},
 			)?;
 		}
+
+		let button = button::construct(
+			&mut layout,
+			my_div_parent,
+			button::Params {
+				text: "Click me!!",
+				color: drawing::Color::new(0.2, 0.2, 0.2, 1.0),
+				size: Vec2::new(256.0, 64.0),
+				text_style: TextStyle {
+					size: Some(30.0),
+					..Default::default()
+				},
+			},
+		)?;
+
+		layout.add_event_listener(
+			button.body,
+			EventListener::MouseClick(Box::new(move |data| {
+				data.call_on_widget(button.text_id, |label: &mut TextLabel| {
+					label.set_text("Congratulations!");
+				});
+			})),
+		);
 
 		Ok(Self { layout })
 	}

@@ -49,6 +49,24 @@ pub struct CallbackData<'a> {
 	pub node_id: taffy::NodeId,
 }
 
+impl CallbackData<'_> {
+	pub fn call_on_widget<WIDGET, FUNC>(&self, widget_id: WidgetID, func: FUNC)
+	where
+		WIDGET: WidgetObj,
+		FUNC: FnOnce(&mut WIDGET),
+	{
+		let Some(widget) = self.widgets.get(widget_id) else {
+			debug_assert!(false);
+			return;
+		};
+
+		let mut lock = widget.lock().unwrap();
+		let m = lock.obj.get_as_mut::<WIDGET>();
+
+		func(m);
+	}
+}
+
 pub type MouseEnterCallback = Box<dyn Fn(&mut CallbackData)>;
 pub type MouseLeaveCallback = Box<dyn Fn(&mut CallbackData)>;
 pub type MouseClickCallback = Box<dyn Fn(&mut CallbackData)>;

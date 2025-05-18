@@ -4,7 +4,7 @@ use std::{
 };
 
 use crate::{
-	event::{self},
+	event::{self, EventListener},
 	transform_stack::{Transform, TransformStack},
 	widget::{self, EventParams, WidgetState, div::Div},
 };
@@ -211,5 +211,14 @@ impl Layout {
 			)?;
 		}
 		Ok(())
+	}
+
+	// helper function
+	pub fn add_event_listener(&self, widget_id: WidgetID, listener: EventListener) {
+		let Some(widget) = self.widget_states.get(widget_id) else {
+			debug_assert!(false);
+			return;
+		};
+		widget.lock().unwrap().add_event_listener(listener);
 	}
 }

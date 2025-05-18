@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use glam::Vec2;
 use taffy::TraversePartialTree;
 
@@ -79,7 +81,7 @@ pub struct Image {
 
 pub enum RenderPrimitive {
 	Rectangle(Boundary, Rectangle),
-	Text(Boundary, RenderableText),
+	Text(Boundary, Arc<RenderableText>),
 	Image(Boundary, Image),
 }
 

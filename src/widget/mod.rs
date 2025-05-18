@@ -35,7 +35,7 @@ pub struct DrawParams<'a> {
 }
 
 pub trait WidgetObj: AnyTrait {
-	fn draw(&self, params: &mut DrawParams);
+	fn draw(&mut self, params: &mut DrawParams);
 	fn measure(
 		&mut self,
 		known_dimensions: taffy::Size<Option<f32>>,
@@ -80,20 +80,6 @@ impl WidgetState {
 		params: &mut EventParams,
 	) -> EventResult {
 		let hovered = event.test_mouse_within_transform(params.transform_stack.get());
-
-		match &event {
-			Event::MouseDown(_) => {
-				if hovered {
-					self.pressed = true;
-				}
-			}
-			Event::MouseUp(_) => {
-				if self.pressed {
-					self.pressed = false;
-				}
-			}
-			_ => {}
-		}
 
 		let mut just_clicked = false;
 		match &event {

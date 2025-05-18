@@ -1,5 +1,6 @@
 use std::sync::Arc;
 
+use glam::Vec2;
 use taffy::{
 	AlignItems, JustifyContent,
 	prelude::{length, percent},
@@ -19,6 +20,8 @@ use crate::{
 pub struct Params<'a> {
 	pub text: &'a str,
 	pub color: drawing::Color,
+	pub size: Vec2,
+	pub text_style: TextStyle,
 }
 
 impl Default for Params<'_> {
@@ -26,12 +29,16 @@ impl Default for Params<'_> {
 		Self {
 			text: "Text",
 			color: drawing::Color::new(1.0, 1.0, 1.0, 1.0),
+			size: Vec2::new(128.0, 32.0),
+			text_style: TextStyle::default(),
 		}
 	}
 }
 
 pub struct Button {
 	color: drawing::Color,
+	pub body: WidgetID,
+	pub text_id: WidgetID,
 }
 
 pub fn construct(
@@ -45,8 +52,8 @@ pub fn construct(
 		Rectangle::create(RectangleParams::default())?,
 		taffy::Style {
 			size: taffy::Size {
-				width: length(128.0),
-				height: length(32.0),
+				width: length(params.size.x),
+				height: length(params.size.y),
 			},
 			padding: length(1.0),
 			..Default::default()
@@ -72,7 +79,7 @@ pub fn construct(
 
 	let light_text = (params.color.r + params.color.g + params.color.b) < 1.5;
 
-	layout.add_child(
+	let (text_id, _) = layout.add_child(
 		inner_bg,
 		TextLabel::create(TextParams {
 			content: String::from(params.text),
@@ -83,7 +90,7 @@ pub fn construct(
 				} else {
 					Color::new(0.0, 0.0, 0.0, 1.0)
 				}),
-				..Default::default()
+				..params.text_style
 			},
 		})?,
 		taffy::Style {
@@ -94,7 +101,9 @@ pub fn construct(
 	let mut widget = layout.widget_states.get(inner_bg).unwrap().lock().unwrap();
 
 	let button = Arc::new(Button {
+		body: outer_border,
 		color: params.color,
+		text_id,
 	});
 
 	// Highlight background on mouse enter
@@ -107,9 +116,9 @@ pub fn construct(
 			rect.params.color.b = button.color.b + 0.2;
 
 			// set border color to white
-			let mut outer = data.widgets.get(outer_border).unwrap().lock().unwrap();
-			let outer_rect = outer.obj.get_as_mut::<Rectangle>();
-			outer_rect.params.color = Color::new(1.0, 1.0, 1.0, 1.0);
+			data.call_on_widget(outer_border, |outer: &mut Rectangle| {
+				outer.params.color = Color::new(1.0, 1.0, 1.0, 1.0);
+			});
 		})));
 	}
 
@@ -121,9 +130,9 @@ pub fn construct(
 			rect.params.color = button.color;
 
 			// restore border color
-			let mut outer = data.widgets.get(outer_border).unwrap().lock().unwrap();
-			let outer_rect = outer.obj.get_as_mut::<Rectangle>();
-			outer_rect.params.color = Color::new(0.0, 0.0, 0.0, 1.0);
+			data.call_on_widget(outer_border, |outer: &mut Rectangle| {
+				outer.params.color = Color::new(0.0, 0.0, 0.0, 1.0);
+			});
 		})));
 	}
 
