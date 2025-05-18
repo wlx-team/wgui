@@ -20,7 +20,7 @@ pub struct Viewport {
 
 impl Viewport {
 	/// Creates a new `Viewport` with the given `device` and `cache`.
-	pub fn new(gfx: WGfx) -> anyhow::Result<Self> {
+	pub fn new(gfx: Arc<WGfx>) -> anyhow::Result<Self> {
 		let params = Params {
 			screen_resolution: [0, 0],
 		};

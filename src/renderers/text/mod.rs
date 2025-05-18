@@ -297,4 +297,6 @@ pub struct TextArea<'a> {
 	pub default_color: Color,
 	/// Additional custom glyphs to render.
 	pub custom_glyphs: &'a [CustomGlyph],
+	/// Distance from camera, 0.0..=1.0
+	pub depth: f32,
 }

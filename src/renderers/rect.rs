@@ -79,7 +79,7 @@ impl RectRenderer {
 		})
 	}
 
-	pub fn add_rect(&mut self, boundary: Boundary, rectangle: Rectangle) {
+	pub fn add_rect(&mut self, boundary: Boundary, rectangle: Rectangle, depth: f32) {
 		let clamped_radius = rectangle
 			.round_radius
 			.min(boundary.w / 2.0)
@@ -97,7 +97,7 @@ impl RectRenderer {
 				rectangle.gradient as u8,
 				0, //FIXME: srgb vs linear?
 			],
-			depth: 0.0, //FIXME: add depth
+			depth,
 		});
 	}
 

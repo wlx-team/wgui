@@ -5,13 +5,14 @@ use testbed::Testbed;
 use vulkan::init_window;
 use wgui::{
 	event::{MouseDownEvent, MouseMotionEvent, MouseUpEvent},
+	gfx::WGfx,
 	renderers::{
-		rect::RectRenderer,
+		rect::{RectPipeline, RectRenderer},
 		text::{
-			text_atlas::{TextAtlas, TextResources},
+			text_atlas::{TextAtlas, TextPipeline},
 			text_renderer::TextRenderer,
-			viewport::Viewport,
 		},
+		viewport::Viewport,
 	},
 	vulkano::{
 		Validated, VulkanError,
@@ -24,7 +25,6 @@ use wgui::{
 		},
 		sync::GpuFuture,
 	},
-	wgfx::WGfx,
 };
 use winit::{
 	event::{Event, WindowEvent},
@@ -75,14 +75,15 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 	let mut recreate = false;
 	let mut last_draw = std::time::Instant::now();
 
-	let common = TextResources::new(gfx.clone(), native_format)?;
-	let mut atlas = TextAtlas::new(common.clone())?;
+	let rect_pipeline = RectPipeline::new(gfx.clone(), native_format)?;
+	let text_pipeline = TextPipeline::new(gfx.clone(), native_format)?;
+	let mut atlas = TextAtlas::new(text_pipeline.clone())?;
 
 	let mut goodies = Goodies {
-		viewport: Viewport::new(common.clone())?,
+		viewport: Viewport::new(gfx.clone())?,
 		text_renderer: TextRenderer::new(&mut atlas)?,
 		text_atlas: atlas,
-		rect_renderer: RectRenderer::new(gfx.clone(), native_format)?,
+		rect_renderer: RectRenderer::new(rect_pipeline)?,
 	};
 
 	let mut testbed = Testbed::new()?;

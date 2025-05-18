@@ -1,4 +1,5 @@
 use std::sync::{Arc, OnceLock};
+use wgui::gfx::WGfx;
 use wgui::vulkano::{
 	self, DeviceSize,
 	command_buffer::allocator::{
@@ -15,7 +16,6 @@ use wgui::vulkano::{
 		allocator::{GenericMemoryAllocatorCreateInfo, StandardMemoryAllocator},
 	},
 };
-use wgui::wgfx::WGfx;
 
 static VULKAN_LIBRARY: OnceLock<Arc<vulkano::VulkanLibrary>> = OnceLock::new();
 fn get_vulkan_library() -> &'static Arc<vulkano::VulkanLibrary> {

@@ -1,10 +1,10 @@
 use wgui::{
 	cosmic_text::Color,
 	drawing::{self, RenderPrimitive},
+	gfx::cmd::GfxCommandBuffer,
 	glam::Vec2,
 	layout::Layout,
 	renderers::text::{FONT_SYSTEM, SWASH_CACHE, TextArea, TextBounds},
-	wgfx::GfxCommandBuffer,
 };
 
 use crate::Goodies;
@@ -56,7 +56,7 @@ impl Testbed {
 		for primitive in primitives.iter() {
 			match primitive {
 				RenderPrimitive::Rectangle(boundary, rectangle) => {
-					goodies.rect_renderer.add_rect(*boundary, *rectangle);
+					goodies.rect_renderer.add_rect(*boundary, *rectangle, 0.0);
 				}
 				RenderPrimitive::Text(boundary, text) => {
 					text_areas.push(TextArea {
@@ -67,13 +67,16 @@ impl Testbed {
 						scale: 1.0,
 						default_color: Color::rgb(255, 0, 0),
 						custom_glyphs: &[],
+						depth: 0.0, //FIXME: add depth info
 					});
 				}
 				RenderPrimitive::Image(_boundary, _image) => todo!(),
 			}
 		}
 
-		goodies.rect_renderer.render(&goodies.viewport, cmd_buf)?;
+		goodies
+			.rect_renderer
+			.render(&mut goodies.viewport, cmd_buf)?;
 
 		{
 			let mut font_system = FONT_SYSTEM.lock().unwrap();
@@ -90,7 +93,7 @@ impl Testbed {
 
 		goodies
 			.text_renderer
-			.render(&goodies.text_atlas, &goodies.viewport, cmd_buf)?;
+			.render(&goodies.text_atlas, &mut goodies.viewport, cmd_buf)?;
 
 		Ok(())
 	}
