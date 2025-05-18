@@ -1,5 +1,5 @@
 use crate::{
-	event,
+	event::{self, CallbackData, Event, EventListener},
 	transform_stack::{Transform, TransformStack},
 	widget::{self, EventParams},
 };
@@ -84,17 +84,19 @@ impl Layout {
 	}
 
 	fn push_event_widget(
-		&mut self,
+		widgets: &WidgetMap,
+		tree: &mut taffy::TaffyTree<WidgetID>,
 		transform_stack: &mut TransformStack,
 		widget_id: WidgetID,
 		event: &event::Event,
 	) -> anyhow::Result<()> {
-		let Some(widget) = self.widgets.get_mut(widget_id) else {
+		let Some(widget) = widgets.get(widget_id) else {
 			debug_assert!(false);
 			anyhow::bail!("invalid widget");
 		};
 
-		let l = self.tree.layout(widget.data().node)?;
+		let data = widget.data();
+		let l = tree.layout(data.node)?;
 
 		let transform = Transform {
 			pos: Vec2::new(l.location.x, l.location.y),
@@ -105,7 +107,15 @@ impl Layout {
 
 		let mut iter_children = true;
 
-		match widget.process_event(event, &EventParams { transform_stack }) {
+		match widget.process_event(
+			widget_id,
+			event,
+			&mut EventParams {
+				transform_stack,
+				widgets,
+				tree,
+			},
+		) {
 			widget::EventResult::Pass => {
 				// go on
 			}
@@ -118,10 +128,8 @@ impl Layout {
 		}
 
 		if iter_children {
-			// FIXME: we are copying a vec here !!!!
-			let children = widget.data().children.clone();
-			for child in &children {
-				self.push_event_widget(transform_stack, *child, event)?;
+			for child in &data.children {
+				Layout::push_event_widget(widgets, tree, transform_stack, *child, event)?;
 			}
 		}
 
@@ -130,9 +138,27 @@ impl Layout {
 		Ok(())
 	}
 
+	pub fn get_widget_as<T: 'static>(widgets: &WidgetMap, id: WidgetID) -> &T {
+		let widget = widgets.get(id).unwrap();
+		let any = (**widget).as_any();
+		any.downcast_ref::<T>().unwrap()
+	}
+
+	pub fn get_widget_as_mut<T: 'static>(widgets: &mut WidgetMap, id: WidgetID) -> &T {
+		let widget = widgets.get_mut(id).unwrap();
+		let any = (**widget).as_any_mut();
+		any.downcast_mut::<T>().unwrap()
+	}
+
 	pub fn push_event(&mut self, event: &event::Event) -> anyhow::Result<()> {
 		let mut transform_stack = TransformStack::new();
-		self.push_event_widget(&mut transform_stack, self.root, event)?;
+		Layout::push_event_widget(
+			&self.widgets,
+			&mut self.tree,
+			&mut transform_stack,
+			self.root,
+			event,
+		)?;
 		Ok(())
 	}
 

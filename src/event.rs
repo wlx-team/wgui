@@ -1,6 +1,12 @@
+use std::rc::Rc;
+
 use glam::Vec2;
 
-use crate::transform_stack::Transform;
+use crate::{
+	layout::{Layout, WidgetID, WidgetMap},
+	transform_stack::Transform,
+	widget::Widget,
+};
 
 // TODO: mouse index
 pub struct MouseDownEvent {
@@ -36,4 +42,19 @@ impl Event {
 			Event::MouseUp(evt) => self.test_transform_pos(transform, &evt.pos),
 		}
 	}
+}
+
+pub struct CallbackData<'a> {
+	pub widgets: &'a WidgetMap,
+	pub widget_id: WidgetID,
+}
+
+pub type MouseEnterCallback = Box<dyn Fn(&CallbackData)>;
+pub type MouseLeaveCallback = Box<dyn Fn(&CallbackData)>;
+pub type MouseClickCallback = Box<dyn Fn(&CallbackData)>;
+
+pub enum EventListener {
+	MouseEnter(MouseEnterCallback),
+	MouseLeave(MouseLeaveCallback),
+	MouseClick(MouseClickCallback),
 }

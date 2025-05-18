@@ -90,6 +90,14 @@ fn print_invalid_value(value: &str) {
 	log::warn!("Invalid value {}", value);
 }
 
+fn parse_val(value: &str) -> Option<f32> {
+	let Ok(val) = value.parse::<f32>() else {
+		print_invalid_value(value);
+		return None;
+	};
+	Some(val)
+}
+
 fn parse_size_unit<T>(value: &str) -> Option<T>
 where
 	T: taffy::prelude::FromPercent + taffy::prelude::FromLength,
@@ -197,6 +205,28 @@ fn style_from_node<'a>(node: roxmltree::Node<'a, 'a>) -> taffy::Style {
 					style.gap = val;
 				}
 			}
+			"flex_basis" => {
+				if let Some(val) = parse_size_unit(value) {
+					style.flex_basis = val;
+				}
+			}
+			"flex_grow" => {
+				if let Some(val) = parse_val(value) {
+					style.flex_grow = val;
+				}
+			}
+			"flex_shrink" => {
+				if let Some(val) = parse_val(value) {
+					style.flex_shrink = val;
+				}
+			}
+			"position" => match value {
+				"absolute" => style.position = taffy::Position::Absolute,
+				"relative" => style.position = taffy::Position::Relative,
+				_ => {
+					print_invalid_attrib(key, value);
+				}
+			},
 			"box_sizing" => match value {
 				"border_box" => style.box_sizing = BoxSizing::BorderBox,
 				"content_box" => style.box_sizing = BoxSizing::ContentBox,

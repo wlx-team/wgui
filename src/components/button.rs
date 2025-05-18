@@ -1,3 +1,5 @@
+use std::rc::Rc;
+
 use taffy::{
 	AlignItems, JustifyContent,
 	prelude::{length, percent},
@@ -5,6 +7,7 @@ use taffy::{
 
 use crate::{
 	drawing::{self, Color},
+	event::EventListener,
 	layout::{Layout, WidgetID},
 	renderers::text::{FontWeight, TextStyle},
 	widget::{
@@ -85,6 +88,18 @@ pub fn construct(layout: &mut Layout, parent: WidgetID, params: Params) -> anyho
 			..Default::default()
 		},
 	)?;
+
+	let widget = layout.widgets.get_mut(inner_bg).unwrap();
+
+	widget.add_event_listener(EventListener::MouseEnter(Box::new(|data| {
+		// TODO: modify widget state somehow?
+		let _rect = Layout::get_widget_as::<Rectangle>(&data.widgets, data.widget_id);
+		println!("mouse enter");
+	})));
+
+	widget.add_event_listener(EventListener::MouseLeave(Box::new(|_data| {
+		println!("mouse leave");
+	})));
 
 	Ok(Button {})
 }
