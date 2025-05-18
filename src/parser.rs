@@ -40,12 +40,12 @@ pub fn parse_color(html_hex: &str) -> Option<drawing::Color> {
 			u8::from_str_radix(&html_hex[3..5], 16),
 			u8::from_str_radix(&html_hex[5..7], 16),
 		) {
-			return Some(drawing::Color([
+			return Some(drawing::Color::new(
 				f32::from(r) / 255.,
 				f32::from(g) / 255.,
 				f32::from(b) / 255.,
 				1.,
-			]));
+			));
 		}
 	} else if html_hex.len() == 9 {
 		if let (Ok(r), Ok(g), Ok(b), Ok(a)) = (
@@ -54,12 +54,12 @@ pub fn parse_color(html_hex: &str) -> Option<drawing::Color> {
 			u8::from_str_radix(&html_hex[5..7], 16),
 			u8::from_str_radix(&html_hex[7..9], 16),
 		) {
-			return Some(drawing::Color([
+			return Some(drawing::Color::new(
 				f32::from(r) / 255.,
 				f32::from(g) / 255.,
 				f32::from(b) / 255.,
 				f32::from(a) / 255.,
-			]));
+			));
 		}
 	}
 	log::warn!("failed to parse color \"{}\"", html_hex);
@@ -303,7 +303,7 @@ fn parse_widget_div<'a>(
 ) -> anyhow::Result<()> {
 	let (new_id, _) = ctx
 		.layout
-		.add_child(parent_id, Div::new()?, style_from_node(node))?;
+		.add_child(parent_id, Div::create()?, style_from_node(node))?;
 
 	parse_universal(ctx, node, new_id)?;
 	parse_children(ctx, node, new_id)?;
@@ -361,7 +361,7 @@ fn parse_widget_rectangle<'a>(
 	let (new_id, _) =
 		ctx
 			.layout
-			.add_child(parent_id, Rectangle::new(params)?, style_from_node(node))?;
+			.add_child(parent_id, Rectangle::create(params)?, style_from_node(node))?;
 
 	parse_universal(ctx, node, new_id)?;
 	parse_children(ctx, node, new_id)?;
@@ -420,7 +420,7 @@ fn parse_widget_label<'a>(
 	let (new_id, _) =
 		ctx
 			.layout
-			.add_child(parent_id, TextLabel::new(params)?, style_from_node(node))?;
+			.add_child(parent_id, TextLabel::create(params)?, style_from_node(node))?;
 
 	parse_universal(ctx, node, new_id)?;
 	parse_children(ctx, node, new_id)?;

@@ -1,30 +1,16 @@
-use std::sync::{Arc, Mutex};
-
 use taffy::Size;
 
-use super::{Widget, WidgetState};
+use super::{WidgetObj, WidgetState};
 
-pub struct Div {
-	data: WidgetState,
-}
+pub struct Div {}
 
 impl Div {
-	pub fn new() -> anyhow::Result<Arc<Mutex<Self>>> {
-		Ok(Arc::new(Mutex::new(Self {
-			data: WidgetState::new()?,
-		})))
+	pub fn create() -> anyhow::Result<WidgetState> {
+		WidgetState::new(Box::new(Self {}))
 	}
 }
 
-impl Widget for Div {
-	fn state_mut(&mut self) -> &mut WidgetState {
-		&mut self.data
-	}
-
-	fn state(&self) -> &WidgetState {
-		&self.data
-	}
-
+impl WidgetObj for Div {
 	fn draw(&self, _params: &mut super::DrawParams) {
 		// no-op
 	}

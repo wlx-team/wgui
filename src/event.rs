@@ -1,8 +1,9 @@
 use glam::Vec2;
 
 use crate::{
-	layout::{WidgetID, WidgetStateMap},
+	layout::{WidgetID, WidgetMap},
 	transform_stack::Transform,
+	widget::WidgetObj,
 };
 
 // TODO: mouse index
@@ -42,14 +43,15 @@ impl Event {
 }
 
 pub struct CallbackData<'a> {
-	pub widgets: &'a WidgetStateMap,
+	pub obj: &'a mut dyn WidgetObj,
+	pub widgets: &'a WidgetMap,
 	pub widget_id: WidgetID,
 	pub node_id: taffy::NodeId,
 }
 
-pub type MouseEnterCallback = Box<dyn Fn(&CallbackData)>;
-pub type MouseLeaveCallback = Box<dyn Fn(&CallbackData)>;
-pub type MouseClickCallback = Box<dyn Fn(&CallbackData)>;
+pub type MouseEnterCallback = Box<dyn Fn(&mut CallbackData)>;
+pub type MouseLeaveCallback = Box<dyn Fn(&mut CallbackData)>;
+pub type MouseClickCallback = Box<dyn Fn(&mut CallbackData)>;
 
 pub enum EventListener {
 	MouseEnter(MouseEnterCallback),

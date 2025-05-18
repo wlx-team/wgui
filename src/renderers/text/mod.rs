@@ -213,24 +213,23 @@ impl From<HorizontalAlign> for Align {
 
 impl From<drawing::Color> for cosmic_text::Color {
 	fn from(value: drawing::Color) -> cosmic_text::Color {
-		let [r, g, b, a] = value.0;
 		cosmic_text::Color::rgba(
-			(r * 255.999) as _,
-			(g * 255.999) as _,
-			(b * 255.999) as _,
-			(a * 255.999) as _,
+			(value.r * 255.999) as _,
+			(value.g * 255.999) as _,
+			(value.b * 255.999) as _,
+			(value.a * 255.999) as _,
 		)
 	}
 }
 
 impl From<cosmic_text::Color> for drawing::Color {
 	fn from(value: cosmic_text::Color) -> drawing::Color {
-		drawing::Color([
+		drawing::Color::new(
 			value.r() as f32 / 255.999,
 			value.g() as f32 / 255.999,
 			value.b() as f32 / 255.999,
 			value.a() as f32 / 255.999,
-		])
+		)
 	}
 }
 

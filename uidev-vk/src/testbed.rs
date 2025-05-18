@@ -36,7 +36,7 @@ impl Testbed {
 				my_div_parent,
 				button::Params {
 					text: "I'm a button!",
-					color: drawing::Color([1.0 - n, n * n, n, 1.0]),
+					color: drawing::Color::new(1.0 - n, n * n, n, 1.0),
 				},
 			)?;
 		}

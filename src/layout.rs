@@ -6,22 +6,21 @@ use std::{
 use crate::{
 	event::{self},
 	transform_stack::{Transform, TransformStack},
-	widget::{self, EventParams},
+	widget::{self, EventParams, WidgetState, div::Div},
 };
 
-use super::widget::{Widget, div::Div};
 use glam::Vec2;
 use slotmap::HopSlotMap;
 use taffy::{TaffyTree, TraversePartialTree};
 
 pub type WidgetID = slotmap::DefaultKey;
-pub type BoxWidget = Arc<Mutex<dyn Widget>>;
-pub type WidgetStateMap = HopSlotMap<slotmap::DefaultKey, BoxWidget>;
+pub type BoxWidget = Arc<Mutex<WidgetState>>;
+pub type WidgetMap = HopSlotMap<slotmap::DefaultKey, BoxWidget>;
 
 pub struct Layout {
 	pub tree: TaffyTree<WidgetID>,
 
-	pub widget_states: WidgetStateMap,
+	pub widget_states: WidgetMap,
 	pub widget_node_map: HashMap<WidgetID, taffy::NodeId>,
 
 	pub root_widget: WidgetID,
@@ -33,12 +32,13 @@ pub struct Layout {
 fn add_child_internal(
 	tree: &mut taffy::TaffyTree<WidgetID>,
 	widget_node_map: &mut HashMap<WidgetID, taffy::NodeId>,
-	vec: &mut WidgetStateMap,
+	vec: &mut WidgetMap,
 	parent_node: Option<taffy::NodeId>,
-	child: BoxWidget,
+	widget: WidgetState,
 	style: taffy::Style,
 ) -> anyhow::Result<(WidgetID, taffy::NodeId)> {
-	let child_id = vec.insert(child);
+	#[allow(clippy::arc_with_non_send_sync)]
+	let child_id = vec.insert(Arc::new(Mutex::new(widget)));
 	let child_node = tree.new_leaf_with_context(style, child_id)?;
 
 	if let Some(parent_node) = parent_node {
@@ -54,7 +54,7 @@ impl Layout {
 	pub fn add_child(
 		&mut self,
 		parent_widget_id: WidgetID,
-		widget: BoxWidget,
+		widget: WidgetState,
 		style: taffy::Style,
 	) -> anyhow::Result<(WidgetID, taffy::NodeId)> {
 		let Some(parent_node) = self.widget_node_map.get(&parent_widget_id).cloned() else {
@@ -101,7 +101,6 @@ impl Layout {
 		};
 
 		let mut widget = widget.lock().unwrap();
-		let state = widget.state_mut();
 
 		let transform = Transform {
 			pos: Vec2::new(l.location.x, l.location.y),
@@ -112,7 +111,7 @@ impl Layout {
 
 		let mut iter_children = true;
 
-		match state.process_event(
+		match widget.process_event(
 			widget_id,
 			node_id,
 			event,
@@ -160,7 +159,7 @@ impl Layout {
 			&mut widget_node_map,
 			&mut widget_states,
 			None, // no parent
-			Div::new()?,
+			Div::create()?,
 			taffy::Style {
 				size: taffy::Size::percent(1.0),
 				..Default::default()

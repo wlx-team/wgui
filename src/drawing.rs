@@ -35,12 +35,23 @@ impl Boundary {
 }
 
 #[derive(Copy, Clone)]
-pub struct Color(pub [f32; 4]);
+pub struct Color {
+	pub r: f32,
+	pub g: f32,
+	pub b: f32,
+	pub a: f32,
+}
+
+impl Color {
+	pub fn new(r: f32, g: f32, b: f32, a: f32) -> Self {
+		Self { r, g, b, a }
+	}
+}
 
 impl Default for Color {
 	fn default() -> Self {
 		// opaque black
-		Self([0.0, 0.0, 0.0, 1.0])
+		Self::new(0.0, 0.0, 0.0, 1.0)
 	}
 }
 
@@ -88,7 +99,7 @@ fn draw_widget(
 		dim: Vec2::new(l.size.width, l.size.height),
 	});
 
-	widget.lock().unwrap().draw(params);
+	widget.lock().unwrap().obj.draw(params);
 
 	draw_children(layout, params, node_id);
 

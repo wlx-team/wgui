@@ -2,7 +2,7 @@ use super::drawing::RenderPrimitive;
 use crate::{
 	any::AnyTrait,
 	event::{CallbackData, Event, EventListener},
-	layout::{Layout, WidgetID, WidgetStateMap},
+	layout::{Layout, WidgetID, WidgetMap},
 	transform_stack::TransformStack,
 };
 
@@ -10,19 +10,20 @@ pub mod div;
 pub mod rectangle;
 pub mod text;
 
-#[derive(Default)]
 pub struct WidgetState {
 	pub hovered: bool,
 	pub pressed: bool,
 	pub event_listeners: Vec<EventListener>,
+	pub obj: Box<dyn WidgetObj>,
 }
 
 impl WidgetState {
-	fn new() -> anyhow::Result<WidgetState> {
+	fn new(obj: Box<dyn WidgetObj>) -> anyhow::Result<WidgetState> {
 		Ok(Self {
 			hovered: false,
 			pressed: false,
 			event_listeners: Vec::new(),
+			obj,
 		})
 	}
 }
@@ -33,9 +34,7 @@ pub struct DrawParams<'a> {
 	pub transform_stack: &'a mut TransformStack,
 }
 
-pub trait Widget: AnyTrait {
-	fn state(&self) -> &WidgetState;
-	fn state_mut(&mut self) -> &mut WidgetState;
+pub trait WidgetObj: AnyTrait {
 	fn draw(&self, params: &mut DrawParams);
 	fn measure(
 		&mut self,
@@ -45,7 +44,7 @@ pub trait Widget: AnyTrait {
 }
 
 pub struct EventParams<'a> {
-	pub widgets: &'a WidgetStateMap,
+	pub widgets: &'a WidgetMap,
 	pub tree: &'a taffy::TaffyTree<WidgetID>,
 	pub transform_stack: &'a TransformStack,
 }
@@ -54,6 +53,18 @@ pub enum EventResult {
 	Pass,
 	Consumed,
 	Outside,
+}
+
+impl dyn WidgetObj {
+	pub fn get_as<T: 'static>(&self) -> &T {
+		let any = self.as_any();
+		any.downcast_ref::<T>().unwrap()
+	}
+
+	pub fn get_as_mut<T: 'static>(&mut self) -> &mut T {
+		let any = self.as_any_mut();
+		any.downcast_mut::<T>().unwrap()
+	}
 }
 
 impl WidgetState {
@@ -100,27 +111,28 @@ impl WidgetState {
 			_ => {}
 		}
 
-		let callback_data = CallbackData {
-			widgets: params.widgets,
-			widget_id,
-			node_id,
-		};
-
 		for listener in &self.event_listeners {
+			let mut data = CallbackData {
+				obj: self.obj.as_mut(),
+				widgets: params.widgets,
+				widget_id,
+				node_id,
+			};
+
 			match listener {
 				EventListener::MouseEnter(callback) => {
 					if hovered && !self.hovered {
-						callback(&callback_data);
+						callback(&mut data);
 					}
 				}
 				EventListener::MouseLeave(callback) => {
 					if !hovered && !self.hovered {
-						callback(&callback_data);
+						callback(&mut data);
 					}
 				}
 				EventListener::MouseClick(callback) => {
 					if just_clicked {
-						callback(&callback_data);
+						callback(&mut data);
 					}
 				}
 			}
@@ -128,11 +140,8 @@ impl WidgetState {
 
 		if self.hovered != hovered {
 			self.hovered = hovered;
-			EventResult::Pass
-		} else if hovered {
-			EventResult::Pass
-		} else {
-			EventResult::Outside
 		}
+
+		EventResult::Pass
 	}
 }

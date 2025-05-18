@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use taffy::{
 	AlignItems, JustifyContent,
 	prelude::{length, percent},
@@ -23,20 +25,24 @@ impl Default for Params<'_> {
 	fn default() -> Self {
 		Self {
 			text: "Text",
-			color: drawing::Color([1.0, 1.0, 1.0, 1.0]),
+			color: drawing::Color::new(1.0, 1.0, 1.0, 1.0),
 		}
 	}
 }
 
 pub struct Button {
-	// to be filled later
+	color: drawing::Color,
 }
 
-pub fn construct(layout: &mut Layout, parent: WidgetID, params: Params) -> anyhow::Result<Button> {
+pub fn construct(
+	layout: &mut Layout,
+	parent: WidgetID,
+	params: Params,
+) -> anyhow::Result<Arc<Button>> {
 	// simulate a border because we don't have it yet
 	let (outer_border, _) = layout.add_child(
 		parent,
-		Rectangle::new(RectangleParams::default())?,
+		Rectangle::create(RectangleParams::default())?,
 		taffy::Style {
 			size: taffy::Size {
 				width: length(128.0),
@@ -49,7 +55,7 @@ pub fn construct(layout: &mut Layout, parent: WidgetID, params: Params) -> anyho
 
 	let (inner_bg, _) = layout.add_child(
 		outer_border,
-		Rectangle::new(RectangleParams {
+		Rectangle::create(RectangleParams {
 			color: params.color,
 			..Default::default()
 		})?,
@@ -64,20 +70,18 @@ pub fn construct(layout: &mut Layout, parent: WidgetID, params: Params) -> anyho
 		},
 	)?;
 
-	let color = &params.color.0;
-
-	let light_text = (color[0] + color[1] + color[2]) < 1.5;
+	let light_text = (params.color.r + params.color.g + params.color.b) < 1.5;
 
 	layout.add_child(
 		inner_bg,
-		TextLabel::new(TextParams {
+		TextLabel::create(TextParams {
 			content: String::from(params.text),
 			style: TextStyle {
 				weight: Some(FontWeight::Bold),
 				color: Some(if light_text {
-					Color([1.0, 1.0, 1.0, 1.0])
+					Color::new(1.0, 1.0, 1.0, 1.0)
 				} else {
-					Color([0.0, 0.0, 0.0, 1.0])
+					Color::new(0.0, 0.0, 0.0, 1.0)
 				}),
 				..Default::default()
 			},
@@ -88,16 +92,40 @@ pub fn construct(layout: &mut Layout, parent: WidgetID, params: Params) -> anyho
 	)?;
 
 	let mut widget = layout.widget_states.get(inner_bg).unwrap().lock().unwrap();
-	let state = widget.state_mut();
 
-	state.add_event_listener(EventListener::MouseEnter(Box::new(|_data| {
-		// TODO: modify widget state somehow?
-		println!("mouse enter");
-	})));
+	let button = Arc::new(Button {
+		color: params.color,
+	});
 
-	state.add_event_listener(EventListener::MouseLeave(Box::new(|_data| {
-		println!("mouse leave");
-	})));
+	// Highlight background on mouse enter
+	{
+		let button = button.clone();
+		widget.add_event_listener(EventListener::MouseEnter(Box::new(move |data| {
+			let rect = data.obj.get_as_mut::<Rectangle>();
+			rect.params.color.r = button.color.r + 0.2;
+			rect.params.color.g = button.color.g + 0.2;
+			rect.params.color.b = button.color.b + 0.2;
 
-	Ok(Button {})
+			// set border color to white
+			let mut outer = data.widgets.get(outer_border).unwrap().lock().unwrap();
+			let outer_rect = outer.obj.get_as_mut::<Rectangle>();
+			outer_rect.params.color = Color::new(1.0, 1.0, 1.0, 1.0);
+		})));
+	}
+
+	// Bring back old color on mouse leave
+	{
+		let button = button.clone();
+		widget.add_event_listener(EventListener::MouseLeave(Box::new(move |data| {
+			let rect = data.obj.get_as_mut::<Rectangle>();
+			rect.params.color = button.color;
+
+			// restore border color
+			let mut outer = data.widgets.get(outer_border).unwrap().lock().unwrap();
+			let outer_rect = outer.obj.get_as_mut::<Rectangle>();
+			outer_rect.params.color = Color::new(0.0, 0.0, 0.0, 1.0);
+		})));
+	}
+
+	Ok(button)
 }
