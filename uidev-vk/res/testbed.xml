@@ -10,19 +10,19 @@
       </rectangle>
       <rectangle color="#226644" width="64" height="64" />
       <rectangle color="#001122" width="64" height="64" />
-      <rectangle color="#99AAFF" round="1.0" width="128" height="128" align_items="center" justify_content="center">
+      <rectangle color="#99AAFF" round="1.0" width="128" height="128" align_items="center" justify_content="center" border="8" border_color="#FFFFFF">
         <label text="I'm centered" color="#FF0000" weight="bold" />
       </rectangle>
       <label text="I'm a text!" color="#0000FF" />
       <label text="I'm a bold text!" color="#0000FF" weight="bold" />
       <label text="I'm a BIG text!" color="#0000FF" weight="bold" size="20" />
-      <rectangle width="400" height="300" round="0.5" id="my_div_parent" color="#FFCC99" align_items="center" align_content="flex_start" justify_content="center" flex_wrap="wrap" gap="8" padding="16" border="2" border_color="#ffffff" >
+      <rectangle width="400" height="300" round="0.5" id="my_div_parent" color="#FFCC99" align_items="center" align_content="flex_start" justify_content="center" flex_wrap="wrap" gap="8" padding="16" border="2" border_color="#ffffff">
         <!-- filled-in at runtime -->
       </rectangle>
     </div>
     <!-- 2/3 green rects -->
     <div width="100%" height="100%" flex_direction="column">
-      <rectangle color="#44aa33" color2="#3344aa" round="0.1" gradient="horizontal" height="100%" border="2" border_color="#ffffff" >
+      <rectangle color="#44aa33" color2="#3344aa" round="0.1" gradient="horizontal" height="100%" border="2" border_color="#ffffff">
         <div margin="16" width="100%" height="100%" align_items="center" justify_content="center" flex_wrap="wrap" align_content="center">
           <rectangle width="64" height="64" color="#000000" />
           <rectangle width="64" height="64" color="#002222" />
@@ -37,6 +37,18 @@
           <rectangle width="64" height="32" color="#ff0000" border="4" border_color="#000000" />
           <rectangle width="64" height="32" color="#ff0000" border="6" border_color="#000000" />
           <rectangle width="64" height="32" color="#ff0000" border="8" border_color="#000000" />
+          <rectangle width="64" height="64" color="#000000" border="2" round="1.0" border_color="#FFFF00" />
+          <rectangle width="64" height="64" color="#000000" border="8" round="1.0" border_color="#FFFF00" />
+          <rectangle width="64" height="64" color="#000000" border="16" round="1.0" border_color="#FFFF00" />
+          <rectangle width="64" height="64" color="#000000" border="30" round="1.0" border_color="#FFFF00" />
+          <rectangle width="64" height="64" color="#000000" border="2" round="0.5" border_color="#FFFF00" />
+          <rectangle width="64" height="64" color="#000000" border="8" round="0.5" border_color="#FFFF00" />
+          <rectangle width="64" height="64" color="#000000" border="12" round="0.5" border_color="#FFFF00" />
+          <rectangle width="64" height="64" color="#000000" border="13" round="0.5" border_color="#FFFF00" />
+          <rectangle width="64" height="64" color="#000000" border="14" round="0.5" border_color="#FFFF00" />
+          <rectangle width="64" height="64" color="#000000" border="15" round="0.5" border_color="#FFFF00" />
+          <rectangle width="64" height="64" color="#000000" border="16.5" round="0.5" border_color="#FFFF00" />
+          <rectangle width="64" height="64" color="#000000" border="30" round="0.5" border_color="#FFFF00" />
           <rectangle color="#000000">
             <rectangle width="200" height="100" color="#ffffff" margin="2" />
           </rectangle>
