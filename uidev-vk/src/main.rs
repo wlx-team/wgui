@@ -1,7 +1,10 @@
-use std::sync::Arc;
-
 use glam::{Vec2, vec2};
+use std::sync::Arc;
 use testbed::Testbed;
+use tracing_subscriber::EnvFilter;
+use tracing_subscriber::filter::LevelFilter;
+use tracing_subscriber::layer::SubscriberExt;
+use tracing_subscriber::util::SubscriberInitExt;
 use vulkan::init_window;
 use wgui::{
 	event::{MouseDownEvent, MouseMotionEvent, MouseUpEvent},
@@ -31,6 +34,7 @@ use winit::{
 	event_loop::ControlFlow,
 };
 
+mod profiler;
 mod testbed;
 mod vulkan;
 
@@ -41,7 +45,25 @@ pub struct Goodies {
 	rect_renderer: RectRenderer,
 }
 
+fn init_logging() {
+	tracing_subscriber::registry()
+		.with(
+			tracing_subscriber::fmt::layer()
+				.pretty()
+				.with_writer(std::io::stderr),
+		)
+		.with(
+			/* read RUST_LOG env var */
+			EnvFilter::builder()
+				.with_default_directive(LevelFilter::DEBUG.into())
+				.from_env_lossy(),
+		)
+		.init();
+}
+
 fn main() -> Result<(), Box<dyn std::error::Error>> {
+	init_logging();
+
 	let (gfx, event_loop, window, surface) = init_window()?;
 	let inner_size = window.inner_size();
 	let mut swapchain_size = [inner_size.width, inner_size.height];
@@ -91,6 +113,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
 	goodies.viewport.update(swapchain_size)?;
 	println!("new swapchain_size: {swapchain_size:?}");
+
+	let mut profiler = profiler::Profiler::new(500);
 
 	#[allow(deprecated)]
 	event_loop.run(move |event, elwt| {
@@ -145,6 +169,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 				event: WindowEvent::RedrawRequested,
 				..
 			} => {
+				profiler.start();
+
 				if recreate {
 					let inner_size = window.inner_size();
 					swapchain_size = [inner_size.width, inner_size.height];
@@ -210,6 +236,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 						.wait(None)
 						.unwrap();
 				}
+
+				profiler.end();
 			}
 			Event::AboutToWait => {
 				if last_draw.elapsed().as_millis() > 16 {
