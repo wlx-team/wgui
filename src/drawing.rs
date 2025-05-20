@@ -104,6 +104,8 @@ fn draw_widget(
 		dim: Vec2::new(l.size.width, l.size.height),
 	});
 
+	params.node_id = node_id;
+
 	widget.lock().unwrap().obj.draw(params);
 
 	draw_children(layout, params, node_id);
@@ -131,14 +133,15 @@ pub fn draw(layout: &Layout) -> anyhow::Result<Vec<RenderPrimitive>> {
 	let mut primitives = Vec::<RenderPrimitive>::new();
 	let mut transform_stack = TransformStack::new();
 
+	let Some(root_widget) = layout.widget_states.get(layout.root_widget) else {
+		panic!("root widget doesn't exist"); // This shouldn't happen
+	};
+
 	let mut params = DrawParams {
 		primitives: &mut primitives,
 		transform_stack: &mut transform_stack,
 		layout,
-	};
-
-	let Some(root_widget) = layout.widget_states.get(layout.root_widget) else {
-		panic!("root widget doesn't exist"); // This shouldn't happen
+		node_id: layout.root_node,
 	};
 
 	draw_widget(layout, &mut params, layout.root_node, root_widget);

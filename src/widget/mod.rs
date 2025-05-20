@@ -32,6 +32,7 @@ pub struct DrawParams<'a> {
 	pub layout: &'a Layout,
 	pub primitives: &'a mut Vec<RenderPrimitive>,
 	pub transform_stack: &'a mut TransformStack,
+	pub node_id: taffy::NodeId, // modified every widget draw() call
 }
 
 pub trait WidgetObj: AnyTrait {

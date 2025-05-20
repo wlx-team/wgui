@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use taffy::{
 	AlignContent, AlignItems, AlignSelf, BoxSizing, FlexDirection, FlexWrap, JustifyContent,
-	JustifySelf,
+	JustifySelf, Overflow,
 };
 
 use crate::{
@@ -191,6 +191,44 @@ fn style_from_node<'a>(node: roxmltree::Node<'a, 'a>) -> taffy::Style {
 					style.padding.right = dim;
 					style.padding.top = dim;
 					style.padding.bottom = dim;
+				}
+			}
+			"overflow_x" => match value {
+				"hidden" => style.overflow.x = Overflow::Hidden,
+				"visible" => style.overflow.x = Overflow::Visible,
+				"clip" => style.overflow.x = Overflow::Clip,
+				"scroll" => style.overflow.x = Overflow::Scroll,
+				_ => {
+					print_invalid_attrib(key, value);
+				}
+			},
+			"overflow_y" => match value {
+				"hidden" => style.overflow.y = Overflow::Hidden,
+				"visible" => style.overflow.y = Overflow::Visible,
+				"clip" => style.overflow.y = Overflow::Clip,
+				"scroll" => style.overflow.y = Overflow::Scroll,
+				_ => {
+					print_invalid_attrib(key, value);
+				}
+			},
+			"min_width" => {
+				if let Some(dim) = parse_size_unit(value) {
+					style.min_size.width = dim;
+				}
+			}
+			"min_height" => {
+				if let Some(dim) = parse_size_unit(value) {
+					style.min_size.height = dim;
+				}
+			}
+			"max_width" => {
+				if let Some(dim) = parse_size_unit(value) {
+					style.max_size.width = dim;
+				}
+			}
+			"max_height" => {
+				if let Some(dim) = parse_size_unit(value) {
+					style.max_size.height = dim;
 				}
 			}
 			"width" => {
