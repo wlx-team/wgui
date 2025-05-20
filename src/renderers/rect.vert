@@ -10,12 +10,13 @@ layout(location = 5) in uint round_border_gradient_srgb;
 layout(location = 6) in float depth;
 
 layout(location = 0) out vec4 out_color;
-layout(location = 1) out vec2 out_uv;
-layout(location = 2) out vec4 out_border_color;
-layout(location = 3) out float out_border_size;
-layout(location = 4) out float out_radius;
-layout(location = 5) out float out_rect_aspect;
-layout(location = 6) out float out_pixel_size;
+layout(location = 1) out vec4 out_color2;
+layout(location = 2) out vec2 out_uv;
+layout(location = 3) out vec4 out_border_color;
+layout(location = 4) out float out_border_size;
+layout(location = 5) out float out_radius;
+layout(location = 6) out float out_rect_aspect;
+layout(location = 7) out float out_pixel_size;
 
 layout(set = 0, binding = 0) uniform UniformParams {
   uniform uvec2 screen_resolution;
@@ -66,17 +67,26 @@ void main() {
   uint gradient_mode = (round_border_gradient_srgb & 0x00ff0000u) >> 16;
 
   uint color;
+  uint color2;
   switch (gradient_mode) {
   case 1:
     // horizontal
     color = corner_position.x > 0u ? in_color2 : in_color;
+    color2 = color;
     break;
   case 2:
     // vertical
     color = corner_position.y > 0u ? in_color2 : in_color;
+    color2 = color;
     break;
-  default: // no gradient
+  case 3:
+    // radial
     color = in_color;
+    color2 = in_color2;
+    break;
+  default: // none
+    color = in_color;
+    color2 = in_color;
     break;
   }
 
@@ -87,11 +97,20 @@ void main() {
                      float((color & 0x0000ff00u) >> 8u) / 255.0,
                      float(color & 0x000000ffu) / 255.0,
                      float((color & 0xff000000u) >> 24u) / 255.0);
+    out_color2 = vec4(float((color2 & 0x00ff0000u) >> 16u) / 255.0,
+                     float((color2 & 0x0000ff00u) >> 8u) / 255.0,
+                     float(color2 & 0x000000ffu) / 255.0,
+                     float((color2 & 0xff000000u) >> 24u) / 255.0);
   } else {
     out_color =
         vec4(srgb_to_linear(float((color & 0x00ff0000u) >> 16u) / 255.0),
              srgb_to_linear(float((color & 0x0000ff00u) >> 8u) / 255.0),
              srgb_to_linear(float(color & 0x000000ffu) / 255.0),
              float((color & 0xff000000u) >> 24u) / 255.0);
+    out_color2 =
+        vec4(srgb_to_linear(float((color2 & 0x00ff0000u) >> 16u) / 255.0),
+             srgb_to_linear(float((color2 & 0x0000ff00u) >> 8u) / 255.0),
+             srgb_to_linear(float(color2 & 0x000000ffu) / 255.0),
+             float((color2 & 0xff000000u) >> 24u) / 255.0);
   }
 }

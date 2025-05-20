@@ -405,6 +405,7 @@ fn parse_widget_rectangle<'a>(
 				params.gradient = match value {
 					"horizontal" => GradientMode::Horizontal,
 					"vertical" => GradientMode::Vertical,
+					"radial" => GradientMode::Radial,
 					"none" => GradientMode::None,
 					_ => {
 						print_invalid_attrib(key, value);

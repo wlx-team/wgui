@@ -64,6 +64,7 @@ pub enum GradientMode {
 	None,
 	Horizontal,
 	Vertical,
+	Radial,
 }
 
 #[derive(Default, Clone, Copy)]
