@@ -13,21 +13,24 @@ use crate::Goodies;
 
 pub struct Testbed {
 	pub layout: Layout,
+	pub scale: f32,
 }
+
+const XML_PATH: &str = "res/testbed.xml";
 
 impl Testbed {
 	pub fn new() -> anyhow::Result<Self> {
 		let mut layout = Layout::new()?;
 
-		use wgui::components::button;
 		let parent = layout.root_widget;
 
 		let res = wgui::parser::parse(
 			&mut layout,
 			parent,
-			std::fs::read_to_string("res/testbed.xml").unwrap().as_str(),
+			std::fs::read_to_string(XML_PATH).unwrap().as_str(),
 		)?;
 
+		use wgui::components::button;
 		let my_div_parent = res.require_by_id("my_div_parent")?;
 
 		// create some buttons for testing
@@ -67,7 +70,7 @@ impl Testbed {
 			})),
 		);
 
-		Ok(Self { layout })
+		Ok(Self { layout, scale: 1.5 })
 	}
 
 	pub fn update(&mut self, width: f32, height: f32) -> anyhow::Result<()> {
@@ -82,15 +85,17 @@ impl Testbed {
 		for primitive in primitives.iter() {
 			match primitive {
 				RenderPrimitive::Rectangle(boundary, rectangle) => {
-					goodies.rect_renderer.add_rect(*boundary, *rectangle, 0.0);
+					goodies
+						.rect_renderer
+						.add_rect(*boundary, *rectangle, self.scale, 0.0);
 				}
 				RenderPrimitive::Text(boundary, text) => {
 					text_areas.push(TextArea {
 						buffer: text.get_buffer(),
-						left: boundary.x,
-						top: boundary.y,
+						left: boundary.x * self.scale,
+						top: boundary.y * self.scale,
 						bounds: TextBounds::default(), //FIXME: just using boundary coords here doesn't work
-						scale: 1.0,
+						scale: self.scale,
 						default_color: Color::rgb(255, 0, 0),
 						custom_glyphs: &[],
 						depth: 0.0, //FIXME: add depth info

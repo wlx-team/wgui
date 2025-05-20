@@ -81,16 +81,16 @@ impl RectRenderer {
 		})
 	}
 
-	pub fn add_rect(&mut self, boundary: Boundary, rectangle: Rectangle, depth: f32) {
+	pub fn add_rect(&mut self, boundary: Boundary, rectangle: Rectangle, scale: f32, depth: f32) {
 		self.rect_vertices.push(RectVertex {
-			in_pos: [boundary.x as _, boundary.y as _],
-			in_dim: [boundary.w as _, boundary.h as _],
+			in_pos: [(boundary.x * scale) as _, (boundary.y * scale) as _],
+			in_dim: [(boundary.w * scale) as _, (boundary.h * scale) as _],
 			in_color: cosmic_text::Color::from(rectangle.color).0,
 			in_color2: cosmic_text::Color::from(rectangle.color2).0,
 			in_border_color: cosmic_text::Color::from(rectangle.border_color).0,
 			round_border_gradient_srgb: [
-				(rectangle.round * 255.0) as u8,
-				rectangle.border as u8,
+				(rectangle.round * scale * 255.0) as u8,
+				(rectangle.border * scale) as u8,
 				rectangle.gradient as u8,
 				0, //FIXME: srgb vs linear?
 			],

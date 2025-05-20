@@ -37,8 +37,8 @@ impl Default for Params<'_> {
 
 pub struct Button {
 	color: drawing::Color,
-	pub body: WidgetID,
-	pub text_id: WidgetID,
+	pub body: WidgetID,    // Rectangle
+	pub text_id: WidgetID, // Text
 }
 
 pub fn construct(
@@ -46,33 +46,20 @@ pub fn construct(
 	parent: WidgetID,
 	params: Params,
 ) -> anyhow::Result<Arc<Button>> {
-	// simulate a border because we don't have it yet
-	let (outer_border, _) = layout.add_child(
+	let (rect_id, _) = layout.add_child(
 		parent,
-		Rectangle::create(RectangleParams::default())?,
-		taffy::Style {
-			size: taffy::Size {
-				width: length(params.size.x),
-				height: length(params.size.y),
-			},
-			padding: length(1.0),
-			..Default::default()
-		},
-	)?;
-
-	let (inner_bg, _) = layout.add_child(
-		outer_border,
 		Rectangle::create(RectangleParams {
 			color: params.color,
 			..Default::default()
 		})?,
 		taffy::Style {
 			size: taffy::Size {
-				width: percent(1.0),
-				height: percent(1.0),
+				width: length(params.size.x),
+				height: length(params.size.y),
 			},
 			align_items: Some(AlignItems::Center),
 			justify_content: Some(JustifyContent::Center),
+			padding: length(1.0),
 			..Default::default()
 		},
 	)?;
@@ -80,7 +67,7 @@ pub fn construct(
 	let light_text = (params.color.r + params.color.g + params.color.b) < 1.5;
 
 	let (text_id, _) = layout.add_child(
-		inner_bg,
+		rect_id,
 		TextLabel::create(TextParams {
 			content: String::from(params.text),
 			style: TextStyle {
@@ -98,10 +85,10 @@ pub fn construct(
 		},
 	)?;
 
-	let mut widget = layout.widget_states.get(inner_bg).unwrap().lock().unwrap();
+	let mut widget = layout.widget_states.get(rect_id).unwrap().lock().unwrap();
 
 	let button = Arc::new(Button {
-		body: outer_border,
+		body: rect_id,
 		color: params.color,
 		text_id,
 	});
@@ -114,11 +101,8 @@ pub fn construct(
 			rect.params.color.r = button.color.r + 0.2;
 			rect.params.color.g = button.color.g + 0.2;
 			rect.params.color.b = button.color.b + 0.2;
-
-			// set border color to white
-			data.call_on_widget(outer_border, |outer: &mut Rectangle| {
-				outer.params.color = Color::new(1.0, 1.0, 1.0, 1.0);
-			});
+			rect.params.border_color = Color::new(1.0, 1.0, 1.0, 1.0);
+			rect.params.border = 1.0;
 		})));
 	}
 
@@ -128,11 +112,7 @@ pub fn construct(
 		widget.add_event_listener(EventListener::MouseLeave(Box::new(move |data| {
 			let rect = data.obj.get_as_mut::<Rectangle>();
 			rect.params.color = button.color;
-
-			// restore border color
-			data.call_on_widget(outer_border, |outer: &mut Rectangle| {
-				outer.params.color = Color::new(0.0, 0.0, 0.0, 1.0);
-			});
+			rect.params.border = 0.0;
 		})));
 	}
 

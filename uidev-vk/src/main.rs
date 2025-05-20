@@ -30,8 +30,9 @@ use wgui::{
 	},
 };
 use winit::{
-	event::{Event, WindowEvent},
+	event::{ElementState, Event, WindowEvent},
 	event_loop::ControlFlow,
+	keyboard::{KeyCode, PhysicalKey},
 };
 
 mod profiler;
@@ -43,6 +44,14 @@ pub struct Goodies {
 	text_renderer: TextRenderer,
 	text_atlas: TextAtlas,
 	rect_renderer: RectRenderer,
+}
+
+impl Goodies {
+	fn regen(&mut self, text_pipeline: &TextPipeline) -> anyhow::Result<()> {
+		self.text_atlas = TextAtlas::new(text_pipeline.clone())?;
+		self.text_renderer = TextRenderer::new(&mut self.text_atlas)?;
+		Ok(())
+	}
 }
 
 fn init_logging() {
@@ -130,13 +139,15 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 						testbed
 							.layout
 							.push_event(&wgui::event::Event::MouseDown(MouseDownEvent {
-								pos: mouse,
+								pos: mouse / testbed.scale,
 							}))
 							.unwrap();
 					} else {
 						testbed
 							.layout
-							.push_event(&wgui::event::Event::MouseUp(MouseUpEvent { pos: mouse }))
+							.push_event(&wgui::event::Event::MouseUp(MouseUpEvent {
+								pos: mouse / testbed.scale,
+							}))
 							.unwrap();
 					}
 				}
@@ -149,9 +160,25 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 				testbed
 					.layout
 					.push_event(&wgui::event::Event::MouseMotion(MouseMotionEvent {
-						pos: mouse,
+						pos: mouse / testbed.scale,
 					}))
 					.unwrap();
+			}
+			Event::WindowEvent {
+				event: WindowEvent::KeyboardInput { event, .. },
+				..
+			} => {
+				if event.state == ElementState::Pressed {
+					if event.physical_key == PhysicalKey::Code(KeyCode::Equal) {
+						testbed.scale *= 1.25;
+						goodies.regen(&text_pipeline).unwrap();
+					}
+
+					if event.physical_key == PhysicalKey::Code(KeyCode::Minus) {
+						testbed.scale *= 0.75;
+						goodies.regen(&text_pipeline).unwrap();
+					}
+				}
 			}
 			Event::WindowEvent {
 				event: WindowEvent::CloseRequested,
@@ -210,7 +237,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 					last_draw = std::time::Instant::now();
 
 					testbed
-						.update(swapchain_size[0] as _, swapchain_size[1] as _)
+						.update(
+							(swapchain_size[0] as f32 / testbed.scale) as _,
+							(swapchain_size[1] as f32 / testbed.scale) as _,
+						)
 						.unwrap();
 
 					let mut cmd_buf = gfx
