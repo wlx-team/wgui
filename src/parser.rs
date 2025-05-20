@@ -1,6 +1,9 @@
 use std::collections::HashMap;
 
-use taffy::{AlignContent, AlignItems, BoxSizing, FlexDirection, FlexWrap, JustifyContent};
+use taffy::{
+	AlignContent, AlignItems, AlignSelf, BoxSizing, FlexDirection, FlexWrap, JustifyContent,
+	JustifySelf,
+};
 
 use crate::{
 	drawing::{self, GradientMode},
@@ -230,6 +233,29 @@ fn style_from_node<'a>(node: roxmltree::Node<'a, 'a>) -> taffy::Style {
 			"box_sizing" => match value {
 				"border_box" => style.box_sizing = BoxSizing::BorderBox,
 				"content_box" => style.box_sizing = BoxSizing::ContentBox,
+				_ => {
+					print_invalid_attrib(key, value);
+				}
+			},
+			"align_self" => match value {
+				"baseline" => style.align_self = Some(AlignSelf::Baseline),
+				"center" => style.align_self = Some(AlignSelf::Center),
+				"end" => style.align_self = Some(AlignSelf::End),
+				"flex_end" => style.align_self = Some(AlignSelf::FlexEnd),
+				"flex_start" => style.align_self = Some(AlignSelf::FlexStart),
+				"start" => style.align_self = Some(AlignSelf::Start),
+				"stretch" => style.align_self = Some(AlignSelf::Stretch),
+				_ => {
+					print_invalid_attrib(key, value);
+				}
+			},
+			"justify_self" => match value {
+				"center" => style.justify_self = Some(JustifySelf::Center),
+				"end" => style.justify_self = Some(JustifySelf::End),
+				"flex_end" => style.justify_self = Some(JustifySelf::FlexEnd),
+				"flex_start" => style.justify_self = Some(JustifySelf::FlexStart),
+				"start" => style.justify_self = Some(JustifySelf::Start),
+				"stretch" => style.justify_self = Some(JustifySelf::Stretch),
 				_ => {
 					print_invalid_attrib(key, value);
 				}

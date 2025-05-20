@@ -1,15 +1,67 @@
 <layout>
   <elements>
     <!-- background for testing -->
-    <rectangle position="absolute" color="#888888" width="100%" height="100%" />
+    <rectangle position="absolute" color="#333333" width="100%" height="100%" />
 
     <!-- left/right separator (menu and rest) -->
     <div flex_direction="row" width="100%" height="100%" gap="8">
-      <div id="menu" width="48" height="200" align_items="center" justify_content="center">
+      <!-- LEFT MENU -->
+      <div id="menu" width="48" height="100%" align_items="center" justify_content="center">
         <rectangle width="100%" round="1.0" color="#0A0A0ACC" flex_direction="column">
-          <div width="100%" height="150" />
-          <rectangle height="2" color="#FFFFFF55" margin_left="8" margin_right="8" />
+          <div width="100%" height="250" />
+          <rectangle height="1" color="#FFFFFF99" margin_left="12" margin_right="12" />
           <div width="100%" height="50" />
+        </rectangle>
+      </div>
+      <!-- REST -->
+      <!-- content/bottom panel separator -->
+      <div flex_direction="column" gap="8" flex_grow="1">
+        <!-- CONTENT -->
+        <rectangle
+          id="content"
+          width="100%"
+          height="100%"
+          align_items="center"
+          justify_content="center"
+          color2="#0d131acc" color="#244179aa" gradient="vertical" round="0.025"
+          flex_direction="column"
+          gap="24"
+        >
+          <rectangle color="#9f7cff" color2="#00e9ff" gradient="vertical" width="96" height="96" round="0.25">
+            <label text="logo" color="#FFFFFF" margin_left="32" margin_top="32" />
+          </rectangle>
+          <label text="Hello, user!" size="32" weight="bold" color="#FFFFFF" margin_left="-172" />
+          <label text="Connected to wlx-overlay-s" size="16" weight="bold" color="#bbffbb" margin_left="-208" margin_top="24" />
+
+          <!-- main button list -->
+          <div flex_direction="row" gap="8" margin_top="32">
+            <rectangle width="120" height="82" round="0.2" border="2" border_color="#FFFFFF77" color="#00000033">
+              <label weight="bold" color="#FFFFFF" size="18" text="Apps" margin_top="48" margin_left="37" />
+            </rectangle>
+            <rectangle width="120" height="82" round="0.2" border="2" border_color="#FFFFFF77" color="#00000033" />
+            <rectangle width="120" height="82" round="0.2" border="2" border_color="#FFFFFF77" color="#00000033" />
+            <rectangle width="120" height="82" round="0.2" border="2" border_color="#FFFFFF77" color="#00000033" />
+            <rectangle width="120" height="82" round="0.2" border="2" border_color="#FFFFFF77" color="#00000033" />
+          </div>
+        </rectangle>
+        <!-- BOTTOM PANEL -->
+        <rectangle
+          width="100%"
+          height="48"
+          box_sizing="border_box"
+          round="0.2"
+          flex_direction="row"
+          align_items="center"
+          justify_content="space_between"
+          color2="#191919"
+          color="#1A2230"
+          gradient="vertical"
+        >
+          <!-- top shine -->
+          <div position="absolute" width="100%" height="100%" justify_content="center">
+            <rectangle position="absolute" width="99%" height="2" color="#FFFFFF44" />
+          </div>
+
         </rectangle>
       </div>
     </div>
