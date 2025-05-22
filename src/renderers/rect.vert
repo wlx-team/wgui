@@ -98,9 +98,9 @@ void main() {
                      float(color & 0x000000ffu) / 255.0,
                      float((color & 0xff000000u) >> 24u) / 255.0);
     out_color2 = vec4(float((color2 & 0x00ff0000u) >> 16u) / 255.0,
-                     float((color2 & 0x0000ff00u) >> 8u) / 255.0,
-                     float(color2 & 0x000000ffu) / 255.0,
-                     float((color2 & 0xff000000u) >> 24u) / 255.0);
+                      float((color2 & 0x0000ff00u) >> 8u) / 255.0,
+                      float(color2 & 0x000000ffu) / 255.0,
+                      float((color2 & 0xff000000u) >> 24u) / 255.0);
   } else {
     out_color =
         vec4(srgb_to_linear(float((color & 0x00ff0000u) >> 16u) / 255.0),

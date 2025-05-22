@@ -33,8 +33,8 @@ impl TextLabel {
 }
 
 impl WidgetObj for TextLabel {
-	fn draw(&mut self, params: &mut super::DrawParams) {
-		let boundary = drawing::Boundary::construct(params.transform_stack);
+	fn draw(&mut self, state: &mut super::DrawState, params: &super::DrawParams) {
+		let boundary = drawing::Boundary::construct(state.transform_stack);
 
 		let renderable = self.renderable.get_or_insert_with(|| {
 			Arc::new(RenderableText::new(
@@ -43,7 +43,7 @@ impl WidgetObj for TextLabel {
 			))
 		});
 
-		params
+		state
 			.primitives
 			.push(drawing::RenderPrimitive::Text(boundary, renderable.clone()));
 	}

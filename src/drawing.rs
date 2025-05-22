@@ -7,9 +7,10 @@ use crate::{
 	layout::BoxWidget,
 	renderers::text::RenderableText,
 	transform_stack::{Transform, TransformStack},
+	widget,
 };
 
-use super::{layout::Layout, widget::DrawParams};
+use super::{layout::Layout, widget::DrawState};
 
 pub struct ImageHandle {
 	// to be implemented, will contain pixel data (RGB or RGBA) loaded via "ImageBank" or something by the gui
@@ -24,6 +25,15 @@ pub struct Boundary {
 }
 
 impl Boundary {
+	pub fn from_pos_size(pos: &Vec2, size: &Vec2) -> Self {
+		Self {
+			x: pos.x,
+			y: pos.y,
+			w: size.x,
+			h: size.y,
+		}
+	}
+
 	pub fn construct(transform_stack: &TransformStack) -> Self {
 		let transform = transform_stack.get();
 
@@ -91,8 +101,9 @@ pub enum RenderPrimitive {
 
 fn draw_widget(
 	layout: &Layout,
-	params: &mut DrawParams,
+	state: &mut DrawState,
 	node_id: taffy::NodeId,
+	style: &taffy::Style,
 	widget: &BoxWidget,
 ) {
 	let Ok(l) = layout.tree.layout(node_id) else {
@@ -100,23 +111,34 @@ fn draw_widget(
 		return;
 	};
 
-	params.transform_stack.push(Transform {
+	state.transform_stack.push(Transform {
 		pos: Vec2::new(l.location.x, l.location.y),
 		dim: Vec2::new(l.size.width, l.size.height),
 	});
 
-	params.node_id = node_id;
+	let obj = &mut widget.lock().unwrap().obj;
+	obj.draw_all(
+		state,
+		&widget::DrawParams {
+			node_id,
+			taffy_layout: l,
+			style,
+		},
+	);
 
-	widget.lock().unwrap().obj.draw(params);
+	draw_children(layout, state, node_id);
 
-	draw_children(layout, params, node_id);
-
-	params.transform_stack.pop();
+	state.transform_stack.pop();
 }
 
-fn draw_children(layout: &Layout, params: &mut DrawParams, parent_node_id: taffy::NodeId) {
+fn draw_children(layout: &Layout, state: &mut DrawState, parent_node_id: taffy::NodeId) {
 	for node_id in layout.tree.child_ids(parent_node_id) {
 		let Some(widget_id) = layout.tree.get_node_context(node_id).cloned() else {
+			debug_assert!(false);
+			continue;
+		};
+
+		let Ok(style) = layout.tree.style(node_id) else {
 			debug_assert!(false);
 			continue;
 		};
@@ -126,7 +148,7 @@ fn draw_children(layout: &Layout, params: &mut DrawParams, parent_node_id: taffy
 			continue;
 		};
 
-		draw_widget(layout, params, node_id, widget);
+		draw_widget(layout, state, node_id, style, widget);
 	}
 }
 
@@ -135,17 +157,20 @@ pub fn draw(layout: &Layout) -> anyhow::Result<Vec<RenderPrimitive>> {
 	let mut transform_stack = TransformStack::new();
 
 	let Some(root_widget) = layout.widget_states.get(layout.root_widget) else {
-		panic!("root widget doesn't exist"); // This shouldn't happen
+		panic!();
 	};
 
-	let mut params = DrawParams {
+	let Ok(style) = layout.tree.style(layout.root_node) else {
+		panic!();
+	};
+
+	let mut params = DrawState {
 		primitives: &mut primitives,
 		transform_stack: &mut transform_stack,
 		layout,
-		node_id: layout.root_node,
 	};
 
-	draw_widget(layout, &mut params, layout.root_node, root_widget);
+	draw_widget(layout, &mut params, layout.root_node, style, root_widget);
 
 	Ok(primitives)
 }

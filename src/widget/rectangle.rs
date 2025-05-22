@@ -27,9 +27,9 @@ impl Rectangle {
 }
 
 impl WidgetObj for Rectangle {
-	fn draw(&mut self, params: &mut super::DrawParams) {
-		params.primitives.push(drawing::RenderPrimitive::Rectangle(
-			drawing::Boundary::construct(params.transform_stack),
+	fn draw(&mut self, state: &mut super::DrawState, _params: &super::DrawParams) {
+		state.primitives.push(drawing::RenderPrimitive::Rectangle(
+			drawing::Boundary::construct(state.transform_stack),
 			drawing::Rectangle {
 				color: self.params.color,
 				color2: self.params.color2,

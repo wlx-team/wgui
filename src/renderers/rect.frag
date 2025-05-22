@@ -25,7 +25,8 @@ void main() {
   float sdf = length(max(abs(coords - center), sdf_rect_dim) - sdf_rect_dim) -
               in_radius;
 
-  vec4 color = mix(in_color, in_color2, min(length((in_uv - vec2(0.5)) * 2.0), 1.0));
+  vec4 color =
+      mix(in_color, in_color2, min(length((in_uv - vec2(0.5)) * 2.0), 1.0));
 
   if (in_border_size < in_radius) {
     // rounded border

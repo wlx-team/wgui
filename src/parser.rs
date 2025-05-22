@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use taffy::{
-	AlignContent, AlignItems, AlignSelf, BoxSizing, FlexDirection, FlexWrap, JustifyContent,
+	AlignContent, AlignItems, AlignSelf, BoxSizing, Display, FlexDirection, FlexWrap, JustifyContent,
 	JustifySelf, Overflow,
 };
 
@@ -137,6 +137,14 @@ fn style_from_node<'a>(node: roxmltree::Node<'a, 'a>) -> taffy::Style {
 		let (key, value) = (attrib.name(), attrib.value());
 
 		match key {
+			"display" => match value {
+				"flex" => style.display = Display::Flex,
+				"block" => style.display = Display::Block,
+				"grid" => style.display = Display::Grid,
+				_ => {
+					print_invalid_attrib(key, value);
+				}
+			},
 			"margin_left" => {
 				if let Some(dim) = parse_size_unit(value) {
 					style.margin.left = dim;

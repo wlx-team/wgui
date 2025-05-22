@@ -21,15 +21,13 @@
           id="content"
           overflow_x="scroll"
           overflow_y="scroll"
-          width="100%"
-          height="100%"
+          flex_grow="1"
           align_items="center"
-          justify_content="center"
           color2="#0d131acc" color="#244179aa" gradient="vertical" round="0.025"
           flex_direction="column"
           gap="24"
         >
-          <rectangle color="#9f7cff" color2="#00e9ff" gradient="vertical" width="96" height="96" round="0.25">
+          <rectangle color="#9f7cff" color2="#00e9ff" gradient="vertical" min_width="96" min_height="96" round="0.25">
             <label text="logo" color="#FFFFFF" margin_left="32" margin_top="32" />
           </rectangle>
           <label text="Hello, user!" size="32" weight="bold" color="#FFFFFF" margin_left="-172" />
@@ -44,6 +42,15 @@
             <rectangle width="120" height="82" round="0.2" border="2" border_color="#FFFFFF77" color="#00000033" />
             <rectangle width="120" height="82" round="0.2" border="2" border_color="#FFFFFF77" color="#00000033" />
             <rectangle width="120" height="82" round="0.2" border="2" border_color="#FFFFFF77" color="#00000033" />
+          </div>
+
+          <!-- long list simulation -->
+          <div flex_wrap="wrap" justify_content="center" gap="32">
+            <rectangle color="#FFFFFF44" min_width="200" min_height="200" />
+            <rectangle color="#FFFFFF44" min_width="200" min_height="200" />
+            <rectangle color="#FFFF0044" min_width="200" min_height="200" />
+            <rectangle color="#00FFFF44" min_width="200" min_height="200" />
+
           </div>
         </rectangle>
         <!-- BOTTOM PANEL -->

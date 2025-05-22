@@ -11,7 +11,7 @@ impl Div {
 }
 
 impl WidgetObj for Div {
-	fn draw(&mut self, _params: &mut super::DrawParams) {
+	fn draw(&mut self, _state: &mut super::DrawState, _params: &super::DrawParams) {
 		// no-op
 	}
 
