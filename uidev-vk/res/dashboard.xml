@@ -18,39 +18,42 @@
       <div flex_direction="column" gap="8" flex_grow="1">
         <!-- CONTENT -->
         <rectangle
-          id="content"
-          overflow_x="scroll"
-          overflow_y="scroll"
-          flex_grow="1"
-          align_items="center"
-          color2="#0d131acc" color="#244179aa" gradient="vertical" round="0.025"
-          flex_direction="column"
-          gap="24"
+          color2="#0d131acc" color="#244179aa" gradient="vertical" round="0.025" overflow_y="hidden"
         >
-          <rectangle color="#9f7cff" color2="#00e9ff" gradient="vertical" min_width="96" min_height="96" round="0.25">
-            <label text="logo" color="#FFFFFF" margin_left="32" margin_top="32" />
-          </rectangle>
-          <label text="Hello, user!" size="32" weight="bold" color="#FFFFFF" margin_left="-172" />
-          <label text="Connected to wlx-overlay-s" size="16" weight="bold" color="#bbffbb" margin_left="-208" margin_top="24" />
-
-          <!-- main button list -->
-          <div flex_direction="row" gap="8" margin_top="32">
-            <rectangle width="120" height="82" round="0.2" border="2" border_color="#FFFFFF77" color="#00000033">
-              <label weight="bold" color="#FFFFFF" size="18" text="Apps" margin_top="48" margin_left="37" />
+          <div
+            id="content"
+            flex_grow="1"
+            align_items="center"
+            overflow_x="scroll"
+            overflow_y="scroll"
+            flex_direction="column"
+            gap="24"
+          >
+            <rectangle color="#9f7cff" color2="#00e9ff" gradient="vertical" min_width="96" min_height="96" round="0.25">
+              <label text="logo" color="#FFFFFF" margin_left="32" margin_top="32" />
             </rectangle>
-            <rectangle width="120" height="82" round="0.2" border="2" border_color="#FFFFFF77" color="#00000033" />
-            <rectangle width="120" height="82" round="0.2" border="2" border_color="#FFFFFF77" color="#00000033" />
-            <rectangle width="120" height="82" round="0.2" border="2" border_color="#FFFFFF77" color="#00000033" />
-            <rectangle width="120" height="82" round="0.2" border="2" border_color="#FFFFFF77" color="#00000033" />
-          </div>
+            <label text="Hello, user!" size="32" weight="bold" color="#FFFFFF" margin_left="-172" />
+            <label text="Connected to wlx-overlay-s" size="16" weight="bold" color="#bbffbb" margin_left="-208" margin_top="24" />
 
-          <!-- long list simulation -->
-          <div flex_wrap="wrap" justify_content="center" gap="32">
-            <rectangle color="#FFFFFF44" min_width="200" min_height="200" />
-            <rectangle color="#FFFFFF44" min_width="200" min_height="200" />
-            <rectangle color="#FFFF0044" min_width="200" min_height="200" />
-            <rectangle color="#00FFFF44" min_width="200" min_height="200" />
+            <!-- main button list -->
+            <div flex_direction="row" gap="8" margin_top="32">
+              <rectangle width="120" height="82" round="0.2" border="2" border_color="#FFFFFF77" color="#00000033">
+                <label weight="bold" color="#FFFFFF" size="18" text="Apps" margin_top="48" margin_left="37" />
+              </rectangle>
+              <rectangle width="120" height="82" round="0.2" border="2" border_color="#FFFFFF77" color="#00000033" />
+              <rectangle width="120" height="82" round="0.2" border="2" border_color="#FFFFFF77" color="#00000033" />
+              <rectangle width="120" height="82" round="0.2" border="2" border_color="#FFFFFF77" color="#00000033" />
+              <rectangle width="120" height="82" round="0.2" border="2" border_color="#FFFFFF77" color="#00000033" />
+            </div>
 
+            <!-- long list simulation -->
+            <div flex_wrap="wrap" justify_content="center" gap="32">
+              <rectangle color="#FFFFFF44" min_width="200" min_height="200" />
+              <rectangle color="#FFFFFF44" min_width="200" min_height="200" />
+              <rectangle color="#FFFF0044" min_width="200" min_height="200" />
+              <rectangle color="#00FFFF44" min_width="200" min_height="200" />
+
+            </div>
           </div>
         </rectangle>
         <!-- BOTTOM PANEL -->
