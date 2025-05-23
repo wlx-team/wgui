@@ -4,9 +4,9 @@ use super::drawing::RenderPrimitive;
 use crate::{
 	any::AnyTrait,
 	drawing,
-	event::{CallbackData, Event, EventListener},
+	event::{CallbackData, Event, EventListener, MouseWheelEvent},
 	layout::{Layout, WidgetID, WidgetMap},
-	transform_stack::TransformStack,
+	transform_stack::{self, TransformStack},
 };
 
 pub mod div;
@@ -17,6 +17,7 @@ pub struct WidgetState {
 	pub hovered: bool,
 	pub pressed: bool,
 	pub event_listeners: Vec<EventListener>,
+	pub scrolling: Vec2, // normalized, 0.0-1.0. Not used in case if overflow != scroll
 	pub obj: Box<dyn WidgetObj>,
 }
 
@@ -26,6 +27,7 @@ impl WidgetState {
 			hovered: false,
 			pressed: false,
 			event_listeners: Vec::new(),
+			scrolling: Vec2::default(),
 			obj,
 		})
 	}
@@ -55,6 +57,9 @@ pub trait WidgetObj: AnyTrait {
 }
 
 pub struct EventParams<'a> {
+	pub node_id: taffy::NodeId,
+	pub style: &'a taffy::Style,
+	pub taffy_layout: &'a taffy::Layout,
 	pub widgets: &'a WidgetMap,
 	pub tree: &'a taffy::TaffyTree<WidgetID>,
 	pub transform_stack: &'a TransformStack,
@@ -66,36 +71,76 @@ pub enum EventResult {
 	Outside,
 }
 
-impl dyn WidgetObj {
-	pub fn draw_all(&mut self, state: &mut DrawState, params: &DrawParams) {
-		self.draw(state, params);
+fn get_scroll_enabled(style: &taffy::Style) -> (bool, bool) {
+	(
+		style.overflow.x == taffy::Overflow::Scroll,
+		style.overflow.y == taffy::Overflow::Scroll,
+	)
+}
 
-		self.draw_scrollbars(state, params);
+pub struct ScrollbarInfo {
+	// total contents size of the currently scrolling widget
+	content_size: Vec2,
+	// 0.0 - 1.0
+	// 1.0: scrollbar handle not visible (inactive)
+	handle_size: Vec2,
+	overflow: Vec2,
+}
+
+pub fn get_scrollbar_info(l: &taffy::Layout) -> Option<ScrollbarInfo> {
+	let overflow = Vec2::new(l.scroll_width(), l.scroll_height());
+	if overflow.x == 0.0 && overflow.y == 0.0 {
+		return None; // not overflowing
 	}
 
-	fn draw_scrollbars(&mut self, state: &mut DrawState, params: &DrawParams) {
-		let enabled_horiz = params.style.overflow.x == taffy::Overflow::Scroll;
-		let enabled_vert = params.style.overflow.y == taffy::Overflow::Scroll;
+	let content_size = Vec2::new(l.content_size.width, l.content_size.height);
+	let handle_size = 1.0 - (overflow / content_size);
 
+	Some(ScrollbarInfo {
+		content_size,
+		handle_size,
+		overflow,
+	})
+}
+
+impl dyn WidgetObj {
+	pub fn get_as<T: 'static>(&self) -> &T {
+		let any = self.as_any();
+		any.downcast_ref::<T>().unwrap()
+	}
+
+	pub fn get_as_mut<T: 'static>(&mut self) -> &mut T {
+		let any = self.as_any_mut();
+		any.downcast_mut::<T>().unwrap()
+	}
+}
+
+impl WidgetState {
+	pub fn add_event_listener(&mut self, listener: EventListener) {
+		self.event_listeners.push(listener);
+	}
+
+	pub fn get_scroll_shift(&self, info: &ScrollbarInfo, l: &taffy::Layout) -> Vec2 {
+		Vec2::new(
+			(info.content_size.x - l.content_box_width()) * self.scrolling.x,
+			(info.content_size.y - l.content_box_height()) * self.scrolling.y,
+		)
+	}
+
+	pub fn draw_all(&mut self, state: &mut DrawState, params: &DrawParams) {
+		self.obj.draw(state, params);
+	}
+
+	pub fn draw_scrollbars(
+		&mut self,
+		state: &mut DrawState,
+		params: &DrawParams,
+		info: &ScrollbarInfo,
+	) {
+		let (enabled_horiz, enabled_vert) = get_scroll_enabled(params.style);
 		if !enabled_horiz && !enabled_vert {
 			return;
 		}
-
-		let l = params.taffy_layout;
-		let overflow = Vec2::new(l.scroll_width(), l.scroll_height());
-
-		if overflow.x == 0.0 && overflow.y == 0.0 {
-			return; // not overflowing
-		}
-
-		let l = params.taffy_layout;
-
-		let size = Vec2::new(l.content_size.width, l.content_size.height);
-
-		//println!("content {:?} overflow {:?}", size, overflow);
-
-		let handle_size = 1.0 - (overflow / size);
-		//println!("handle sizes {:?}", handle_size);
 
 		let transform = state.transform_stack.get();
 
@@ -111,48 +156,65 @@ impl dyn WidgetObj {
 		};
 
 		// Horizontal handle
-		if enabled_horiz && handle_size.x < 1.0 {
+		if enabled_horiz && info.handle_size.x < 1.0 {
 			state.primitives.push(drawing::RenderPrimitive::Rectangle(
 				drawing::Boundary::from_pos_size(
 					&Vec2::new(
-						transform.pos.x,
+						transform.pos.x + transform.dim.x * (1.0 - info.handle_size.x) * self.scrolling.x,
 						transform.pos.y + transform.dim.y - thickness - margin,
 					),
-					&Vec2::new(transform.dim.x * handle_size.x, thickness),
+					&Vec2::new(transform.dim.x * info.handle_size.x, thickness),
 				),
 				rect_params,
 			));
 		}
 
 		// Vertical handle
-		if enabled_vert && handle_size.y < 1.0 {
+		if enabled_vert && info.handle_size.y < 1.0 {
 			state.primitives.push(drawing::RenderPrimitive::Rectangle(
 				drawing::Boundary::from_pos_size(
 					&Vec2::new(
 						transform.pos.x + transform.dim.x - thickness - margin,
-						transform.pos.y,
+						transform.pos.y + transform.dim.y * (1.0 - info.handle_size.y) * self.scrolling.y,
 					),
-					&Vec2::new(thickness, transform.dim.y * handle_size.y),
+					&Vec2::new(thickness, transform.dim.y * info.handle_size.y),
 				),
 				rect_params,
 			));
 		}
 	}
 
-	pub fn get_as<T: 'static>(&self) -> &T {
-		let any = self.as_any();
-		any.downcast_ref::<T>().unwrap()
-	}
+	fn process_wheel(&mut self, params: &mut EventParams, wheel: &MouseWheelEvent) -> bool {
+		let (enabled_horiz, enabled_vert) = get_scroll_enabled(params.style);
+		if !enabled_horiz && !enabled_vert {
+			return false;
+		}
 
-	pub fn get_as_mut<T: 'static>(&mut self) -> &mut T {
-		let any = self.as_any_mut();
-		any.downcast_mut::<T>().unwrap()
-	}
-}
+		let l = params.taffy_layout;
+		let overflow = Vec2::new(l.scroll_width(), l.scroll_height());
+		if overflow.x == 0.0 && overflow.y == 0.0 {
+			return false; // not overflowing
+		}
 
-impl WidgetState {
-	pub fn add_event_listener(&mut self, listener: EventListener) {
-		self.event_listeners.push(listener);
+		let Some(info) = get_scrollbar_info(params.taffy_layout) else {
+			return false;
+		};
+
+		let step_pixels = 32.0;
+
+		if info.handle_size.x < 1.0 && wheel.pos.x != 0.0 {
+			// Horizontal scrolling
+			let mult = (1.0 / (l.content_box_width() - info.content_size.x)) * step_pixels;
+			self.scrolling.x = (self.scrolling.x + wheel.shift.x * mult).clamp(0.0, 1.0);
+		}
+
+		if info.handle_size.y < 1.0 && wheel.pos.y != 0.0 {
+			// Vertical scrolling
+			let mult = (1.0 / (l.content_box_height() - info.content_size.y)) * step_pixels;
+			self.scrolling.y = (self.scrolling.y + wheel.shift.y * mult).clamp(0.0, 1.0);
+		}
+
+		true
 	}
 
 	pub fn process_event(
@@ -175,6 +237,11 @@ impl WidgetState {
 				if self.pressed {
 					self.pressed = false;
 					just_clicked = self.hovered;
+				}
+			}
+			Event::MouseWheel(e) => {
+				if self.process_wheel(params, e) {
+					return EventResult::Consumed;
 				}
 			}
 			_ => {}

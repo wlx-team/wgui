@@ -1,6 +1,6 @@
 use glam::Vec2;
 
-#[derive(Default)]
+#[derive(Default, Copy, Clone)]
 pub struct Transform {
 	pub pos: Vec2,
 
@@ -16,7 +16,7 @@ impl Transform {
 	}
 }
 
-const TRANSFORM_STACK_MAX: usize = 32;
+const TRANSFORM_STACK_MAX: usize = 64;
 pub struct TransformStack {
 	pub stack: [Transform; TRANSFORM_STACK_MAX],
 	top: u8,
@@ -25,7 +25,7 @@ pub struct TransformStack {
 impl TransformStack {
 	pub fn new() -> Self {
 		Self {
-			stack: Default::default(),
+			stack: [Default::default(); TRANSFORM_STACK_MAX],
 			top: 1,
 		}
 	}

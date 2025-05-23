@@ -6,7 +6,7 @@ use taffy::TraversePartialTree;
 use crate::{
 	layout::BoxWidget,
 	renderers::text::RenderableText,
-	transform_stack::{Transform, TransformStack},
+	transform_stack::{self, Transform, TransformStack},
 	widget,
 };
 
@@ -111,24 +111,33 @@ fn draw_widget(
 		return;
 	};
 
-	state.transform_stack.push(Transform {
-		pos: Vec2::new(l.location.x, l.location.y),
+	let mut widget_state = widget.lock().unwrap();
+
+	let (shift, info) = match widget::get_scrollbar_info(l) {
+		Some(info) => (widget_state.get_scroll_shift(&info, l), Some(info)),
+		None => (Vec2::default(), None),
+	};
+
+	state.transform_stack.push(transform_stack::Transform {
+		pos: Vec2::new(l.location.x, l.location.y) - shift,
 		dim: Vec2::new(l.size.width, l.size.height),
 	});
 
-	let obj = &mut widget.lock().unwrap().obj;
-	obj.draw_all(
-		state,
-		&widget::DrawParams {
-			node_id,
-			taffy_layout: l,
-			style,
-		},
-	);
+	let draw_params = widget::DrawParams {
+		node_id,
+		taffy_layout: l,
+		style,
+	};
+
+	widget_state.draw_all(state, &draw_params);
 
 	draw_children(layout, state, node_id);
 
 	state.transform_stack.pop();
+
+	if let Some(info) = &info {
+		widget_state.draw_scrollbars(state, &draw_params, info);
+	}
 }
 
 fn draw_children(layout: &Layout, state: &mut DrawState, parent_node_id: taffy::NodeId) {

@@ -95,6 +95,8 @@ impl Layout {
 			anyhow::bail!("invalid widget ID");
 		};
 
+		let style = self.tree.style(node_id)?;
+
 		let Some(widget) = self.widget_states.get(widget_id) else {
 			debug_assert!(false);
 			anyhow::bail!("invalid widget");
@@ -119,13 +121,16 @@ impl Layout {
 				transform_stack,
 				widgets: &self.widget_states,
 				tree: &self.tree,
+				node_id,
+				style,
+				taffy_layout: l,
 			},
 		) {
 			widget::EventResult::Pass => {
 				// go on
 			}
 			widget::EventResult::Consumed => {
-				todo!();
+				iter_children = false;
 			}
 			widget::EventResult::Outside => {
 				iter_children = false;

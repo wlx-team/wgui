@@ -7,7 +7,7 @@ use tracing_subscriber::layer::SubscriberExt;
 use tracing_subscriber::util::SubscriberInitExt;
 use vulkan::init_window;
 use wgui::{
-	event::{MouseDownEvent, MouseMotionEvent, MouseUpEvent},
+	event::{MouseDownEvent, MouseMotionEvent, MouseUpEvent, MouseWheelEvent},
 	gfx::WGfx,
 	renderers::{
 		rect::{RectPipeline, RectRenderer},
@@ -30,7 +30,7 @@ use wgui::{
 	},
 };
 use winit::{
-	event::{ElementState, Event, WindowEvent},
+	event::{ElementState, Event, MouseScrollDelta, WindowEvent},
 	event_loop::ControlFlow,
 	keyboard::{KeyCode, PhysicalKey},
 };
@@ -130,6 +130,19 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 		elwt.set_control_flow(ControlFlow::Poll);
 
 		match event {
+			Event::WindowEvent {
+				event: WindowEvent::MouseWheel { delta, .. },
+				..
+			} => match delta {
+				MouseScrollDelta::LineDelta(x, y) => testbed
+					.layout
+					.push_event(&wgui::event::Event::MouseWheel(MouseWheelEvent {
+						shift: Vec2::new(x, y),
+						pos: mouse / testbed.scale,
+					}))
+					.unwrap(),
+				MouseScrollDelta::PixelDelta(_) => todo!(),
+			},
 			Event::WindowEvent {
 				event: WindowEvent::MouseInput { state, button, .. },
 				..

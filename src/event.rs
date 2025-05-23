@@ -19,10 +19,16 @@ pub struct MouseUpEvent {
 	pub pos: Vec2,
 }
 
+pub struct MouseWheelEvent {
+	pub pos: Vec2,
+	pub shift: Vec2,
+}
+
 pub enum Event {
 	MouseDown(MouseDownEvent),
 	MouseMotion(MouseMotionEvent),
 	MouseUp(MouseUpEvent),
+	MouseWheel(MouseWheelEvent),
 }
 
 impl Event {
@@ -38,6 +44,7 @@ impl Event {
 			Event::MouseDown(evt) => self.test_transform_pos(transform, &evt.pos),
 			Event::MouseMotion(evt) => self.test_transform_pos(transform, &evt.pos),
 			Event::MouseUp(evt) => self.test_transform_pos(transform, &evt.pos),
+			Event::MouseWheel(evt) => self.test_transform_pos(transform, &evt.pos),
 		}
 	}
 }
