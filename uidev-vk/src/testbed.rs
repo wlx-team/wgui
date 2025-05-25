@@ -5,7 +5,7 @@ use wgui::{
 	gfx::cmd::GfxCommandBuffer,
 	glam::Vec2,
 	layout::Layout,
-	renderers::text::{FONT_SYSTEM, SWASH_CACHE, TextArea, TextBounds, TextStyle},
+	renderer_vk::text::{FONT_SYSTEM, SWASH_CACHE, TextArea, TextBounds, TextStyle},
 	widget::text::TextLabel,
 };
 

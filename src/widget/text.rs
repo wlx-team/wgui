@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use crate::{
 	drawing::{self},
-	renderers::text::{RenderableText, TextStyle},
+	renderer_vk::text::{RenderableText, TextStyle},
 };
 
 use super::{WidgetObj, WidgetState};
@@ -53,6 +53,11 @@ impl WidgetObj for TextLabel {
 		_known_dimensions: taffy::Size<Option<f32>>,
 		_available_space: taffy::Size<taffy::AvailableSpace>,
 	) -> taffy::Size<f32> {
-		todo!();
+		let Some(renderable) = &self.renderable else {
+			return taffy::Size::ZERO;
+		};
+
+		// todo
+		taffy::Size::ZERO
 	}
 }

@@ -185,34 +185,35 @@ impl Layout {
 		if self.tree.dirty(self.root_node)? || self.prev_size != size {
 			println!("re-computing layout, size {}x{}", size.x, size.y);
 			self.prev_size = size;
-			self.tree.compute_layout(
+			self.tree.compute_layout_with_measure(
 				self.root_node,
 				taffy::Size {
 					width: taffy::AvailableSpace::Definite(size.x),
 					height: taffy::AvailableSpace::Definite(size.y),
 				},
-				/*
-								|known_dimensions, available_space, _node_id, node_context, _style| {
-									if let Size {
-										width: Some(width),
-										height: Some(height),
-									} = known_dimensions
-									{
-										return Size { width, height };
-									}
+				|known_dimensions, available_space, _node_id, node_context, _style| {
+					if let taffy::Size {
+						width: Some(width),
+						height: Some(height),
+					} = known_dimensions
+					{
+						return taffy::Size { width, height };
+					}
 
-									match node_context {
-										None => Size::ZERO,
-										Some(h) => {
-											if let Some(w) = self.widgets.get_mut(h) {
-												w.measure(known_dimensions, available_space)
-											} else {
-												Size::ZERO
-											}
-										}
-									}
-								},
-				*/
+					match node_context {
+						None => taffy::Size::ZERO,
+						Some(h) => {
+							if let Some(w) = self.widget_states.get(*h) {
+								w.lock()
+									.unwrap()
+									.obj
+									.measure(known_dimensions, available_space)
+							} else {
+								taffy::Size::ZERO
+							}
+						}
+					}
+				},
 			)?;
 		}
 		Ok(())

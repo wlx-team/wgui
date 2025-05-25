@@ -5,8 +5,8 @@ use taffy::TraversePartialTree;
 
 use crate::{
 	layout::BoxWidget,
-	renderers::text::RenderableText,
-	transform_stack::{self, Transform, TransformStack},
+	renderer_vk::text::RenderableText,
+	transform_stack::{self, TransformStack},
 	widget,
 };
 

@@ -6,7 +6,7 @@ use crate::{
 	drawing,
 	event::{CallbackData, Event, EventListener, MouseWheelEvent},
 	layout::{Layout, WidgetID, WidgetMap},
-	transform_stack::{self, TransformStack},
+	transform_stack::TransformStack,
 };
 
 pub mod div;
@@ -51,9 +51,11 @@ pub trait WidgetObj: AnyTrait {
 	fn draw(&mut self, state: &mut DrawState, params: &DrawParams);
 	fn measure(
 		&mut self,
-		known_dimensions: taffy::Size<Option<f32>>,
-		available_space: taffy::Size<taffy::AvailableSpace>,
-	) -> taffy::Size<f32>;
+		_known_dimensions: taffy::Size<Option<f32>>,
+		_available_space: taffy::Size<taffy::AvailableSpace>,
+	) -> taffy::Size<f32> {
+		taffy::Size::ZERO
+	}
 }
 
 pub struct EventParams<'a> {
@@ -84,7 +86,6 @@ pub struct ScrollbarInfo {
 	// 0.0 - 1.0
 	// 1.0: scrollbar handle not visible (inactive)
 	handle_size: Vec2,
-	overflow: Vec2,
 }
 
 pub fn get_scrollbar_info(l: &taffy::Layout) -> Option<ScrollbarInfo> {
@@ -99,7 +100,6 @@ pub fn get_scrollbar_info(l: &taffy::Layout) -> Option<ScrollbarInfo> {
 	Some(ScrollbarInfo {
 		content_size,
 		handle_size,
-		overflow,
 	})
 }
 

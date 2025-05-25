@@ -5,7 +5,7 @@ pub mod event;
 pub mod gfx;
 pub mod layout;
 pub mod parser;
-pub mod renderers;
+pub mod renderer_vk;
 pub mod transform_stack;
 pub mod widget;
 

@@ -14,12 +14,4 @@ impl WidgetObj for Div {
 	fn draw(&mut self, _state: &mut super::DrawState, _params: &super::DrawParams) {
 		// no-op
 	}
-
-	fn measure(
-		&mut self,
-		_: taffy::Size<Option<f32>>,
-		_: taffy::Size<taffy::AvailableSpace>,
-	) -> taffy::Size<f32> {
-		Size::ZERO
-	}
 }

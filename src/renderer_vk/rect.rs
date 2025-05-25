@@ -141,13 +141,13 @@ impl RectRenderer {
 pub mod vert_rect {
 	vulkano_shaders::shader! {
 			ty: "vertex",
-			path: "src/renderers/rect.vert",
+			path: "src/renderer_vk/shaders/rect.vert",
 	}
 }
 
 pub mod frag_rect {
 	vulkano_shaders::shader! {
 			ty: "fragment",
-			path: "src/renderers/rect.frag",
+			path: "src/renderer_vk/shaders/rect.frag",
 	}
 }

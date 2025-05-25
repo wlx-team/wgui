@@ -8,7 +8,7 @@ use taffy::{
 use crate::{
 	drawing::{self, GradientMode},
 	layout::{Layout, WidgetID},
-	renderers::text::{FontWeight, HorizontalAlign},
+	renderer_vk::text::{FontWeight, HorizontalAlign},
 	widget::{
 		div::Div,
 		rectangle::{Rectangle, RectangleParams},

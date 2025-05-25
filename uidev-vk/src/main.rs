@@ -9,7 +9,7 @@ use vulkan::init_window;
 use wgui::{
 	event::{MouseDownEvent, MouseMotionEvent, MouseUpEvent, MouseWheelEvent},
 	gfx::WGfx,
-	renderers::{
+	renderer_vk::{
 		rect::{RectPipeline, RectRenderer},
 		text::{
 			text_atlas::{TextAtlas, TextPipeline},

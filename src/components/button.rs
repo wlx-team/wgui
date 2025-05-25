@@ -10,7 +10,7 @@ use crate::{
 	drawing::{self, Color},
 	event::EventListener,
 	layout::{Layout, WidgetID},
-	renderers::text::{FontWeight, TextStyle},
+	renderer_vk::text::{FontWeight, TextStyle},
 	widget::{
 		rectangle::{Rectangle, RectangleParams},
 		text::{TextLabel, TextParams},
