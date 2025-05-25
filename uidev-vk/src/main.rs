@@ -10,6 +10,7 @@ use wgui::{
 	event::{MouseDownEvent, MouseMotionEvent, MouseUpEvent, MouseWheelEvent},
 	gfx::WGfx,
 	renderer_vk::{
+		self,
 		rect::{RectPipeline, RectRenderer},
 		text::{
 			text_atlas::{TextAtlas, TextPipeline},
@@ -38,21 +39,6 @@ use winit::{
 mod profiler;
 mod testbed;
 mod vulkan;
-
-pub struct Goodies {
-	viewport: Viewport,
-	text_renderer: TextRenderer,
-	text_atlas: TextAtlas,
-	rect_renderer: RectRenderer,
-}
-
-impl Goodies {
-	fn regen(&mut self, text_pipeline: &TextPipeline) -> anyhow::Result<()> {
-		self.text_atlas = TextAtlas::new(text_pipeline.clone())?;
-		self.text_renderer = TextRenderer::new(&mut self.text_atlas)?;
-		Ok(())
-	}
-}
 
 fn init_logging() {
 	tracing_subscriber::registry()
@@ -106,21 +92,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 	let mut recreate = false;
 	let mut last_draw = std::time::Instant::now();
 
-	let rect_pipeline = RectPipeline::new(gfx.clone(), native_format)?;
-	let text_pipeline = TextPipeline::new(gfx.clone(), native_format)?;
-	let mut atlas = TextAtlas::new(text_pipeline.clone())?;
-
-	let mut goodies = Goodies {
-		viewport: Viewport::new(gfx.clone())?,
-		text_renderer: TextRenderer::new(&mut atlas)?,
-		text_atlas: atlas,
-		rect_renderer: RectRenderer::new(rect_pipeline)?,
-	};
-
 	let mut testbed = Testbed::new()?;
 	let mut mouse = Vec2::ZERO;
 
-	goodies.viewport.update(swapchain_size)?;
+	let mut render_context =
+		renderer_vk::context::Context::new(gfx.clone(), native_format, testbed.scale)?;
+
+	render_context.update_viewport(swapchain_size, testbed.scale)?;
 	println!("new swapchain_size: {swapchain_size:?}");
 
 	let mut profiler = profiler::Profiler::new(500);
@@ -184,12 +162,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 				if event.state == ElementState::Pressed {
 					if event.physical_key == PhysicalKey::Code(KeyCode::Equal) {
 						testbed.scale *= 1.25;
-						goodies.regen(&text_pipeline).unwrap();
+						render_context.regen().unwrap();
 					}
 
 					if event.physical_key == PhysicalKey::Code(KeyCode::Minus) {
 						testbed.scale *= 0.75;
-						goodies.regen(&text_pipeline).unwrap();
+						render_context.regen().unwrap();
 					}
 				}
 			}
@@ -228,7 +206,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 						(swapchain, image_views)
 					};
 
-					goodies.viewport.update(swapchain_size).unwrap();
+					render_context
+						.update_viewport(swapchain_size, testbed.scale)
+						.unwrap();
+
 					println!("new swapchain_size: {swapchain_size:?}");
 					recreate = false;
 					window.request_redraw();
@@ -261,7 +242,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 						.unwrap();
 					cmd_buf.begin_rendering(tgt).unwrap();
 
-					testbed.draw(&mut cmd_buf, &mut goodies).unwrap();
+					let primitives = wgui::drawing::draw(&testbed.layout).unwrap();
+					render_context.draw(&mut cmd_buf, &primitives).unwrap();
 
 					cmd_buf.end_rendering().unwrap();
 
