@@ -15,12 +15,62 @@ use super::{
 	viewport::Viewport,
 };
 
+struct RendererPass<'a> {
+	submitted: bool,
+	text_areas: Vec<TextArea<'a>>,
+	text_renderer: TextRenderer,
+	rect_renderer: RectRenderer,
+}
+
+impl RendererPass<'_> {
+	fn new(text_atlas: &mut TextAtlas, rect_pipeline: RectPipeline) -> anyhow::Result<Self> {
+		let text_renderer = TextRenderer::new(text_atlas)?;
+		let rect_renderer = RectRenderer::new(rect_pipeline)?;
+
+		Ok(Self {
+			submitted: false,
+			text_renderer,
+			rect_renderer,
+			text_areas: Vec::new(),
+		})
+	}
+
+	fn submit(
+		&mut self,
+		viewport: &mut Viewport,
+		cmd_buf: &mut GfxCommandBuffer,
+		text_atlas: &mut TextAtlas,
+	) -> anyhow::Result<()> {
+		if self.submitted {
+			return Ok(());
+		}
+		self.submitted = true;
+
+		self.rect_renderer.render(viewport, cmd_buf)?;
+
+		{
+			let mut font_system = FONT_SYSTEM.lock().unwrap();
+			let mut swash_cache = SWASH_CACHE.lock().unwrap();
+
+			self.text_renderer.prepare(
+				&mut font_system,
+				text_atlas,
+				viewport,
+				std::mem::take(&mut self.text_areas),
+				&mut swash_cache,
+			)?;
+		}
+
+		self.text_renderer.render(text_atlas, viewport, cmd_buf)?;
+
+		Ok(())
+	}
+}
+
 pub struct Context {
 	viewport: Viewport,
-	text_renderer: TextRenderer,
 	text_atlas: TextAtlas,
-	rect_renderer: RectRenderer,
-
+	rect_pipeline: RectPipeline,
 	text_pipeline: TextPipeline,
 	scale: f32,
 }
@@ -33,17 +83,13 @@ impl Context {
 	) -> anyhow::Result<Self> {
 		let rect_pipeline = RectPipeline::new(gfx.clone(), native_format)?;
 		let text_pipeline = TextPipeline::new(gfx.clone(), native_format)?;
-
 		let viewport = Viewport::new(gfx.clone())?;
-		let mut text_atlas = TextAtlas::new(text_pipeline.clone())?;
-		let text_renderer = TextRenderer::new(&mut text_atlas)?;
-		let rect_renderer = RectRenderer::new(rect_pipeline)?;
+		let text_atlas = TextAtlas::new(text_pipeline.clone())?;
 
 		Ok(Self {
 			viewport,
-			text_renderer,
-			rect_renderer,
 			text_atlas,
+			rect_pipeline,
 			text_pipeline,
 			scale,
 		})
@@ -51,7 +97,6 @@ impl Context {
 
 	pub fn regen(&mut self) -> anyhow::Result<()> {
 		self.text_atlas = TextAtlas::new(self.text_pipeline.clone())?;
-		self.text_renderer = TextRenderer::new(&mut self.text_atlas)?;
 		Ok(())
 	}
 
@@ -64,22 +109,47 @@ impl Context {
 		Ok(())
 	}
 
+	fn new_pass(&mut self, passes: &mut Vec<RendererPass>) -> anyhow::Result<()> {
+		passes.push(RendererPass::new(
+			&mut self.text_atlas,
+			self.rect_pipeline.clone(),
+		)?);
+
+		Ok(())
+	}
+
+	fn submit_pass(
+		&mut self,
+		cmd_buf: &mut GfxCommandBuffer,
+		pass: &mut RendererPass,
+	) -> anyhow::Result<()> {
+		pass.submit(&mut self.viewport, cmd_buf, &mut self.text_atlas)?;
+		Ok(())
+	}
+
 	pub fn draw(
 		&mut self,
 		cmd_buf: &mut GfxCommandBuffer,
 		primitives: &[drawing::RenderPrimitive],
 	) -> anyhow::Result<()> {
-		let mut text_areas = vec![];
+		let mut passes = Vec::<RendererPass>::new();
+		self.new_pass(&mut passes)?;
 
 		for primitive in primitives.iter() {
+			let pass = passes.last_mut().unwrap(); // always safe
+
 			match primitive {
+				drawing::RenderPrimitive::Submit => {
+					self.submit_pass(cmd_buf, pass)?;
+					self.new_pass(&mut passes)?;
+				}
 				drawing::RenderPrimitive::Rectangle(boundary, rectangle) => {
-					self
+					pass
 						.rect_renderer
 						.add_rect(*boundary, *rectangle, self.scale, 0.0);
 				}
 				drawing::RenderPrimitive::Text(boundary, text) => {
-					text_areas.push(TextArea {
+					pass.text_areas.push(TextArea {
 						buffer: text.get_buffer(),
 						left: boundary.x * self.scale,
 						top: boundary.y * self.scale,
@@ -94,24 +164,8 @@ impl Context {
 			}
 		}
 
-		self.rect_renderer.render(&mut self.viewport, cmd_buf)?;
-
-		{
-			let mut font_system = FONT_SYSTEM.lock().unwrap();
-			let mut swash_cache = SWASH_CACHE.lock().unwrap();
-
-			self.text_renderer.prepare(
-				&mut font_system,
-				&mut self.text_atlas,
-				&self.viewport,
-				text_areas,
-				&mut swash_cache,
-			)?;
-		}
-
-		self
-			.text_renderer
-			.render(&self.text_atlas, &mut self.viewport, cmd_buf)?;
+		let pass = passes.last_mut().unwrap();
+		self.submit_pass(cmd_buf, pass)?;
 
 		Ok(())
 	}

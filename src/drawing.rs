@@ -94,6 +94,7 @@ pub struct Image {
 }
 
 pub enum RenderPrimitive {
+	Submit,
 	Rectangle(Boundary, Rectangle),
 	Text(Boundary, Arc<RenderableText>),
 	Image(Boundary, Image),
