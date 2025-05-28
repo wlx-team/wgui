@@ -2,6 +2,7 @@ use glam::Vec2;
 
 use super::drawing::RenderPrimitive;
 use crate::{
+	animation,
 	any::AnyTrait,
 	drawing,
 	event::{CallbackData, Event, EventListener, MouseWheelEvent},
@@ -65,6 +66,7 @@ pub struct EventParams<'a> {
 	pub widgets: &'a WidgetMap,
 	pub tree: &'a taffy::TaffyTree<WidgetID>,
 	pub transform_stack: &'a TransformStack,
+	pub animations: &'a mut Vec<animation::Animation>,
 	pub needs_redraw: &'a mut bool,
 }
 
@@ -259,6 +261,7 @@ impl WidgetState {
 		let mut data = CallbackData {
 			obj: self.obj.as_mut(),
 			widgets: params.widgets,
+			animations: &mut params.animations,
 			widget_id,
 			node_id,
 			needs_redraw: false,
@@ -272,7 +275,7 @@ impl WidgetState {
 					}
 				}
 				EventListener::MouseLeave(callback) => {
-					if !hovered && !self.hovered {
+					if !hovered && self.hovered {
 						callback(&mut data);
 					}
 				}

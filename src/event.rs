@@ -1,6 +1,7 @@
 use glam::Vec2;
 
 use crate::{
+	animation,
 	layout::{WidgetID, WidgetMap},
 	transform_stack::Transform,
 	widget::WidgetObj,
@@ -51,6 +52,7 @@ impl Event {
 
 pub struct CallbackData<'a> {
 	pub obj: &'a mut dyn WidgetObj,
+	pub animations: &'a mut Vec<animation::Animation>,
 	pub widgets: &'a WidgetMap,
 	pub widget_id: WidgetID,
 	pub node_id: taffy::NodeId,

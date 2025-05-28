@@ -4,6 +4,7 @@ use glam::Vec2;
 use taffy::{AlignItems, JustifyContent, prelude::length};
 
 use crate::{
+	animation::{Animation, AnimationEasing},
 	drawing::{self, Color},
 	event::EventListener,
 	layout::{Layout, WidgetID},
@@ -38,6 +39,42 @@ pub struct Button {
 	pub text_id: WidgetID, // Text
 }
 
+fn anim_hover_in(button: Arc<Button>, widget_id: WidgetID) -> Animation {
+	Animation::new(
+		widget_id,
+		10,
+		AnimationEasing::OutQuad,
+		Box::new(move |data| {
+			let rect = data.obj.get_as_mut::<Rectangle>();
+			let brightness = data.pos * 0.5;
+			rect.params.color.r = button.color.r + brightness;
+			rect.params.color.g = button.color.g + brightness;
+			rect.params.color.b = button.color.b + brightness;
+			rect.params.border_color = Color::new(1.0, 1.0, 1.0, 1.0);
+			rect.params.border = 1.0 + data.pos * 2.0;
+			data.needs_redraw = true;
+		}),
+	)
+}
+
+fn anim_hover_out(button: Arc<Button>, widget_id: WidgetID) -> Animation {
+	Animation::new(
+		widget_id,
+		15,
+		AnimationEasing::OutQuad,
+		Box::new(move |data| {
+			let rect = data.obj.get_as_mut::<Rectangle>();
+			let brightness = (1.0 - data.pos) * 0.5;
+			rect.params.color.r = button.color.r + brightness;
+			rect.params.color.g = button.color.g + brightness;
+			rect.params.color.b = button.color.b + brightness;
+			rect.params.border_color = Color::new(1.0, 1.0, 1.0, 1.0);
+			rect.params.border = 1.0 + (1.0 - data.pos) * 2.0;
+			data.needs_redraw = true;
+		}),
+	)
+}
+
 pub fn construct(
 	layout: &mut Layout,
 	parent: WidgetID,
@@ -47,6 +84,7 @@ pub fn construct(
 		parent,
 		Rectangle::create(RectangleParams {
 			color: params.color,
+			round: 0.1,
 			..Default::default()
 		})?,
 		taffy::Style {
@@ -94,13 +132,9 @@ pub fn construct(
 	{
 		let button = button.clone();
 		widget.add_event_listener(EventListener::MouseEnter(Box::new(move |data| {
-			let rect = data.obj.get_as_mut::<Rectangle>();
-			rect.params.color.r = button.color.r + 0.2;
-			rect.params.color.g = button.color.g + 0.2;
-			rect.params.color.b = button.color.b + 0.2;
-			rect.params.border_color = Color::new(1.0, 1.0, 1.0, 1.0);
-			rect.params.border = 1.0;
-			data.needs_redraw = true;
+			data
+				.animations
+				.push(anim_hover_in(button.clone(), data.widget_id));
 		})));
 	}
 
@@ -108,10 +142,9 @@ pub fn construct(
 	{
 		let button = button.clone();
 		widget.add_event_listener(EventListener::MouseLeave(Box::new(move |data| {
-			let rect = data.obj.get_as_mut::<Rectangle>();
-			rect.params.color = button.color;
-			rect.params.border = 0.0;
-			data.needs_redraw = true;
+			data
+				.animations
+				.push(anim_hover_out(button.clone(), data.widget_id));
 		})));
 	}
 

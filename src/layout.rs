@@ -4,6 +4,7 @@ use std::{
 };
 
 use crate::{
+	animation::{self, Animations},
 	event::{self, EventListener},
 	transform_stack::{Transform, TransformStack},
 	widget::{self, EventParams, WidgetState, div::Div},
@@ -19,6 +20,7 @@ pub type WidgetMap = HopSlotMap<slotmap::DefaultKey, BoxWidget>;
 
 struct PushEventState<'a> {
 	pub needs_redraw: bool,
+	pub animations: &'a mut Vec<animation::Animation>,
 	pub transform_stack: &'a mut TransformStack,
 }
 
@@ -34,6 +36,8 @@ pub struct Layout {
 	pub prev_size: Vec2,
 
 	pub needs_redraw: bool,
+
+	pub animations: Animations,
 }
 
 fn add_child_internal(
@@ -130,6 +134,7 @@ impl Layout {
 				transform_stack: state.transform_stack,
 				widgets: &self.widget_states,
 				tree: &self.tree,
+				animations: &mut state.animations,
 				needs_redraw: &mut state.needs_redraw,
 				node_id,
 				style,
@@ -169,16 +174,25 @@ impl Layout {
 
 	pub fn push_event(&mut self, event: &event::Event) -> anyhow::Result<()> {
 		let mut transform_stack = TransformStack::new();
+		let mut animations_to_add = Vec::<animation::Animation>::new();
 
 		let mut state = PushEventState {
 			needs_redraw: false,
 			transform_stack: &mut transform_stack,
+			animations: &mut animations_to_add,
 		};
 
 		self.push_event_widget(&mut state, self.root_node, event)?;
 
 		if state.needs_redraw {
 			self.needs_redraw = true;
+		}
+
+		if !animations_to_add.is_empty() {
+			self.needs_redraw = true;
+			for anim in animations_to_add {
+				self.animations.add(anim);
+			}
 		}
 
 		Ok(())
@@ -209,10 +223,15 @@ impl Layout {
 			widget_node_map,
 			widget_states,
 			needs_redraw: true,
+			animations: Animations::new(),
 		})
 	}
 
-	pub fn update(&mut self, size: Vec2) -> anyhow::Result<()> {
+	pub fn update(&mut self, size: Vec2, timestep_alpha: f32) -> anyhow::Result<()> {
+		self
+			.animations
+			.process(&self.widget_states, timestep_alpha, &mut self.needs_redraw);
+
 		if self.tree.dirty(self.root_node)? || self.prev_size != size {
 			self.needs_redraw = true;
 			println!("re-computing layout, size {}x{}", size.x, size.y);
@@ -249,6 +268,12 @@ impl Layout {
 			)?;
 		}
 		Ok(())
+	}
+
+	pub fn tick(&mut self) {
+		self
+			.animations
+			.tick(&self.widget_states, &mut self.needs_redraw);
 	}
 
 	// helper function

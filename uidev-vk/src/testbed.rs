@@ -12,10 +12,10 @@ pub struct Testbed {
 	pub scale: f32,
 }
 
-const XML_PATH: &str = "res/testbed.xml";
-
 impl Testbed {
 	pub fn new() -> anyhow::Result<Self> {
+		const XML_PATH: &str = "res/testbed.xml";
+
 		let mut layout = Layout::new()?;
 
 		let parent = layout.root_widget;
@@ -69,8 +69,10 @@ impl Testbed {
 		Ok(Self { layout, scale: 1.5 })
 	}
 
-	pub fn update(&mut self, width: f32, height: f32) -> anyhow::Result<()> {
-		self.layout.update(Vec2::new(width, height))?;
+	pub fn update(&mut self, width: f32, height: f32, timestep_alpha: f32) -> anyhow::Result<()> {
+		self
+			.layout
+			.update(Vec2::new(width, height), timestep_alpha)?;
 		Ok(())
 	}
 }

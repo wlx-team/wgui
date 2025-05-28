@@ -1,6 +1,7 @@
 use glam::{Vec2, vec2};
 use std::sync::Arc;
 use testbed::Testbed;
+use timestep::Timestep;
 use tracing_subscriber::EnvFilter;
 use tracing_subscriber::filter::LevelFilter;
 use tracing_subscriber::layer::SubscriberExt;
@@ -30,6 +31,7 @@ use winit::{
 
 mod profiler;
 mod testbed;
+mod timestep;
 mod vulkan;
 
 fn init_logging() {
@@ -95,6 +97,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
 	let mut profiler = profiler::Profiler::new(100);
 	let mut frame_index: u64 = 0;
+
+	let mut timestep = Timestep::new();
+	timestep.set_tps(60.0);
 
 	#[allow(deprecated)]
 	event_loop.run(move |event, elwt| {
@@ -210,6 +215,18 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 					window.request_redraw();
 				}
 
+				while timestep.on_tick() {
+					testbed.layout.tick();
+				}
+
+				testbed
+					.update(
+						(swapchain_size[0] as f32 / testbed.scale) as _,
+						(swapchain_size[1] as f32 / testbed.scale) as _,
+						timestep.alpha,
+					)
+					.unwrap();
+
 				if !render_context.dirty && !testbed.layout.check_toggle_needs_redraw() {
 					// no need to redraw
 					std::thread::sleep(std::time::Duration::from_millis(5)); // dirty fix to prevent cpu burning precious cycles doing a busy loop
@@ -235,13 +252,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 					let tgt = images[image_index as usize].clone();
 
 					last_draw = std::time::Instant::now();
-
-					testbed
-						.update(
-							(swapchain_size[0] as f32 / testbed.scale) as _,
-							(swapchain_size[1] as f32 / testbed.scale) as _,
-						)
-						.unwrap();
 
 					let mut cmd_buf = gfx
 						.create_gfx_command_buffer(CommandBufferUsage::OneTimeSubmit)
