@@ -65,6 +65,7 @@ pub struct EventParams<'a> {
 	pub widgets: &'a WidgetMap,
 	pub tree: &'a taffy::TaffyTree<WidgetID>,
 	pub transform_stack: &'a TransformStack,
+	pub needs_redraw: &'a mut bool,
 }
 
 pub enum EventResult {
@@ -205,13 +206,21 @@ impl WidgetState {
 		if info.handle_size.x < 1.0 && wheel.pos.x != 0.0 {
 			// Horizontal scrolling
 			let mult = (1.0 / (l.content_box_width() - info.content_size.x)) * step_pixels;
-			self.scrolling.x = (self.scrolling.x + wheel.shift.x * mult).clamp(0.0, 1.0);
+			let new_scroll = (self.scrolling.x + wheel.shift.x * mult).clamp(0.0, 1.0);
+			if self.scrolling.x != new_scroll {
+				self.scrolling.x = new_scroll;
+				*params.needs_redraw = true;
+			}
 		}
 
 		if info.handle_size.y < 1.0 && wheel.pos.y != 0.0 {
 			// Vertical scrolling
 			let mult = (1.0 / (l.content_box_height() - info.content_size.y)) * step_pixels;
-			self.scrolling.y = (self.scrolling.y + wheel.shift.y * mult).clamp(0.0, 1.0);
+			let new_scroll = (self.scrolling.y + wheel.shift.y * mult).clamp(0.0, 1.0);
+			if self.scrolling.y != new_scroll {
+				self.scrolling.y = new_scroll;
+				*params.needs_redraw = true;
+			}
 		}
 
 		true
@@ -247,14 +256,15 @@ impl WidgetState {
 			_ => {}
 		}
 
-		for listener in &self.event_listeners {
-			let mut data = CallbackData {
-				obj: self.obj.as_mut(),
-				widgets: params.widgets,
-				widget_id,
-				node_id,
-			};
+		let mut data = CallbackData {
+			obj: self.obj.as_mut(),
+			widgets: params.widgets,
+			widget_id,
+			node_id,
+			needs_redraw: false,
+		};
 
+		for listener in &self.event_listeners {
 			match listener {
 				EventListener::MouseEnter(callback) => {
 					if hovered && !self.hovered {
@@ -272,6 +282,10 @@ impl WidgetState {
 					}
 				}
 			}
+		}
+
+		if data.needs_redraw {
+			*params.needs_redraw = true;
 		}
 
 		if self.hovered != hovered {

@@ -73,6 +73,7 @@ pub struct Context {
 	rect_pipeline: RectPipeline,
 	text_pipeline: TextPipeline,
 	scale: f32,
+	pub dirty: bool,
 }
 
 impl Context {
@@ -92,11 +93,13 @@ impl Context {
 			rect_pipeline,
 			text_pipeline,
 			scale,
+			dirty: true,
 		})
 	}
 
 	pub fn regen(&mut self) -> anyhow::Result<()> {
 		self.text_atlas = TextAtlas::new(self.text_pipeline.clone())?;
+		self.dirty = true;
 		Ok(())
 	}
 
@@ -104,6 +107,9 @@ impl Context {
 		if self.scale != scale {
 			self.scale = scale;
 			self.regen()?;
+		}
+		if self.viewport.resolution() != resolution {
+			self.dirty = true;
 		}
 		self.viewport.update(resolution)?;
 		Ok(())
@@ -132,6 +138,7 @@ impl Context {
 		cmd_buf: &mut GfxCommandBuffer,
 		primitives: &[drawing::RenderPrimitive],
 	) -> anyhow::Result<()> {
+		self.dirty = false;
 		let mut passes = Vec::<RendererPass>::new();
 		self.new_pass(&mut passes)?;
 

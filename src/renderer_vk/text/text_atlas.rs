@@ -174,6 +174,7 @@ impl InnerAtlas {
 		}
 	}
 
+	#[allow(dead_code)]
 	pub fn num_channels(&self) -> usize {
 		self.kind.num_channels()
 	}

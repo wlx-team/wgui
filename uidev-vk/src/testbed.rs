@@ -1,11 +1,9 @@
 use wgui::{
-	cosmic_text::Color,
-	drawing::{self, RenderPrimitive},
+	drawing::{self},
 	event::EventListener,
-	gfx::cmd::GfxCommandBuffer,
 	glam::Vec2,
 	layout::Layout,
-	renderer_vk::text::{FONT_SYSTEM, SWASH_CACHE, TextArea, TextBounds, TextStyle},
+	renderer_vk::text::TextStyle,
 	widget::text::TextLabel,
 };
 
@@ -30,7 +28,6 @@ impl Testbed {
 
 		use wgui::components::button;
 		let my_div_parent = res.require_by_id("my_div_parent")?;
-
 		// create some buttons for testing
 		for i in 0..10 {
 			let n = i as f32 / 10.0;
@@ -65,6 +62,7 @@ impl Testbed {
 				data.call_on_widget(button.text_id, |label: &mut TextLabel| {
 					label.set_text("Congratulations!");
 				});
+				data.needs_redraw = true;
 			})),
 		);
 

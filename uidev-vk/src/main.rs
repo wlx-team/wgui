@@ -9,15 +9,7 @@ use vulkan::init_window;
 use wgui::{
 	event::{MouseDownEvent, MouseMotionEvent, MouseUpEvent, MouseWheelEvent},
 	gfx::WGfx,
-	renderer_vk::{
-		self,
-		rect::{RectPipeline, RectRenderer},
-		text::{
-			text_atlas::{TextAtlas, TextPipeline},
-			text_renderer::TextRenderer,
-		},
-		viewport::Viewport,
-	},
+	renderer_vk::{self},
 	vulkano::{
 		Validated, VulkanError,
 		command_buffer::CommandBufferUsage,
@@ -101,7 +93,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 	render_context.update_viewport(swapchain_size, testbed.scale)?;
 	println!("new swapchain_size: {swapchain_size:?}");
 
-	let mut profiler = profiler::Profiler::new(500);
+	let mut profiler = profiler::Profiler::new(100);
+	let mut frame_index: u64 = 0;
 
 	#[allow(deprecated)]
 	event_loop.run(move |event, elwt| {
@@ -162,12 +155,16 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 				if event.state == ElementState::Pressed {
 					if event.physical_key == PhysicalKey::Code(KeyCode::Equal) {
 						testbed.scale *= 1.25;
-						render_context.regen().unwrap();
+						render_context
+							.update_viewport(swapchain_size, testbed.scale)
+							.unwrap();
 					}
 
 					if event.physical_key == PhysicalKey::Code(KeyCode::Minus) {
 						testbed.scale *= 0.75;
-						render_context.regen().unwrap();
+						render_context
+							.update_viewport(swapchain_size, testbed.scale)
+							.unwrap();
 					}
 				}
 			}
@@ -187,8 +184,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 				event: WindowEvent::RedrawRequested,
 				..
 			} => {
-				profiler.start();
-
 				if recreate {
 					let inner_size = window.inner_size();
 					swapchain_size = [inner_size.width, inner_size.height];
@@ -214,6 +209,17 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 					recreate = false;
 					window.request_redraw();
 				}
+
+				if !render_context.dirty && !testbed.layout.check_toggle_needs_redraw() {
+					// no need to redraw
+					std::thread::sleep(std::time::Duration::from_millis(5)); // dirty fix to prevent cpu burning precious cycles doing a busy loop
+					return;
+				}
+
+				log::info!("drawing frame {}", frame_index);
+				frame_index += 1;
+
+				profiler.start();
 
 				{
 					let (image_index, _, acquire_future) =

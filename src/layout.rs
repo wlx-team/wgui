@@ -17,6 +17,11 @@ pub type WidgetID = slotmap::DefaultKey;
 pub type BoxWidget = Arc<Mutex<WidgetState>>;
 pub type WidgetMap = HopSlotMap<slotmap::DefaultKey, BoxWidget>;
 
+struct PushEventState<'a> {
+	pub needs_redraw: bool,
+	pub transform_stack: &'a mut TransformStack,
+}
+
 pub struct Layout {
 	pub tree: TaffyTree<WidgetID>,
 
@@ -27,6 +32,8 @@ pub struct Layout {
 	pub root_node: taffy::NodeId,
 
 	pub prev_size: Vec2,
+
+	pub needs_redraw: bool,
 }
 
 fn add_child_internal(
@@ -61,6 +68,8 @@ impl Layout {
 			anyhow::bail!("invalid parent widget");
 		};
 
+		self.needs_redraw = true;
+
 		add_child_internal(
 			&mut self.tree,
 			&mut self.widget_node_map,
@@ -74,11 +83,11 @@ impl Layout {
 	fn push_event_children(
 		&self,
 		parent_node_id: taffy::NodeId,
-		transform_stack: &mut TransformStack,
+		state: &mut PushEventState,
 		event: &event::Event,
 	) -> anyhow::Result<()> {
 		for child_id in self.tree.child_ids(parent_node_id) {
-			self.push_event_widget(transform_stack, child_id, event)?;
+			self.push_event_widget(state, child_id, event)?;
 		}
 
 		Ok(())
@@ -86,7 +95,7 @@ impl Layout {
 
 	fn push_event_widget(
 		&self,
-		transform_stack: &mut TransformStack,
+		state: &mut PushEventState,
 		node_id: taffy::NodeId,
 		event: &event::Event,
 	) -> anyhow::Result<()> {
@@ -109,7 +118,7 @@ impl Layout {
 			dim: Vec2::new(l.size.width, l.size.height),
 		};
 
-		transform_stack.push(transform);
+		state.transform_stack.push(transform);
 
 		let mut iter_children = true;
 
@@ -118,9 +127,10 @@ impl Layout {
 			node_id,
 			event,
 			&mut EventParams {
-				transform_stack,
+				transform_stack: state.transform_stack,
 				widgets: &self.widget_states,
 				tree: &self.tree,
+				needs_redraw: &mut state.needs_redraw,
 				node_id,
 				style,
 				taffy_layout: l,
@@ -140,17 +150,37 @@ impl Layout {
 		drop(widget); // free mutex
 
 		if iter_children {
-			self.push_event_children(node_id, transform_stack, event)?;
+			self.push_event_children(node_id, state, event)?;
 		}
 
-		transform_stack.pop();
+		state.transform_stack.pop();
 
 		Ok(())
 	}
 
+	pub fn check_toggle_needs_redraw(&mut self) -> bool {
+		if self.needs_redraw {
+			self.needs_redraw = false;
+			true
+		} else {
+			false
+		}
+	}
+
 	pub fn push_event(&mut self, event: &event::Event) -> anyhow::Result<()> {
 		let mut transform_stack = TransformStack::new();
-		self.push_event_widget(&mut transform_stack, self.root_node, event)?;
+
+		let mut state = PushEventState {
+			needs_redraw: false,
+			transform_stack: &mut transform_stack,
+		};
+
+		self.push_event_widget(&mut state, self.root_node, event)?;
+
+		if state.needs_redraw {
+			self.needs_redraw = true;
+		}
+
 		Ok(())
 	}
 
@@ -178,11 +208,13 @@ impl Layout {
 			root_widget,
 			widget_node_map,
 			widget_states,
+			needs_redraw: true,
 		})
 	}
 
 	pub fn update(&mut self, size: Vec2) -> anyhow::Result<()> {
 		if self.tree.dirty(self.root_node)? || self.prev_size != size {
+			self.needs_redraw = true;
 			println!("re-computing layout, size {}x{}", size.x, size.y);
 			self.prev_size = size;
 			self.tree.compute_layout_with_measure(

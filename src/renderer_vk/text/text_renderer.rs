@@ -1,7 +1,7 @@
 use crate::{gfx::cmd::GfxCommandBuffer, renderer_vk::viewport::Viewport};
 
 use super::{
-	ContentType, FONT_SYSTEM, FontSystem, GlyphDetails, GpuCacheStatus, SwashCache, TextArea,
+	ContentType, FontSystem, GlyphDetails, GpuCacheStatus, SwashCache, TextArea,
 	custom_glyph::{CustomGlyphCacheKey, RasterizeCustomGlyphRequest, RasterizedCustomGlyph},
 	text_atlas::{ColorMode, GlyphVertex, TextAtlas, TextPipeline},
 };

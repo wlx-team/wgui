@@ -1,5 +1,3 @@
-use taffy::Size;
-
 use super::{WidgetObj, WidgetState};
 
 pub struct Div {}

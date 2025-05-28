@@ -33,7 +33,7 @@ impl TextLabel {
 }
 
 impl WidgetObj for TextLabel {
-	fn draw(&mut self, state: &mut super::DrawState, params: &super::DrawParams) {
+	fn draw(&mut self, state: &mut super::DrawState, _params: &super::DrawParams) {
 		let boundary = drawing::Boundary::construct(state.transform_stack);
 
 		let renderable = self.renderable.get_or_insert_with(|| {
@@ -53,7 +53,7 @@ impl WidgetObj for TextLabel {
 		_known_dimensions: taffy::Size<Option<f32>>,
 		_available_space: taffy::Size<taffy::AvailableSpace>,
 	) -> taffy::Size<f32> {
-		let Some(renderable) = &self.renderable else {
+		let Some(_renderable) = &self.renderable else {
 			return taffy::Size::ZERO;
 		};
 

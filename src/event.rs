@@ -54,6 +54,7 @@ pub struct CallbackData<'a> {
 	pub widgets: &'a WidgetMap,
 	pub widget_id: WidgetID,
 	pub node_id: taffy::NodeId,
+	pub needs_redraw: bool,
 }
 
 impl CallbackData<'_> {

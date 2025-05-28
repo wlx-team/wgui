@@ -1,5 +1,3 @@
-use taffy::Size;
-
 use crate::drawing::{self, GradientMode};
 
 use super::{WidgetObj, WidgetState};

@@ -1,10 +1,7 @@
 use std::sync::Arc;
 
 use glam::Vec2;
-use taffy::{
-	AlignItems, JustifyContent,
-	prelude::{length, percent},
-};
+use taffy::{AlignItems, JustifyContent, prelude::length};
 
 use crate::{
 	drawing::{self, Color},
@@ -103,6 +100,7 @@ pub fn construct(
 			rect.params.color.b = button.color.b + 0.2;
 			rect.params.border_color = Color::new(1.0, 1.0, 1.0, 1.0);
 			rect.params.border = 1.0;
+			data.needs_redraw = true;
 		})));
 	}
 
@@ -113,6 +111,7 @@ pub fn construct(
 			let rect = data.obj.get_as_mut::<Rectangle>();
 			rect.params.color = button.color;
 			rect.params.border = 0.0;
+			data.needs_redraw = true;
 		})));
 	}
 
