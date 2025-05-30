@@ -5,7 +5,7 @@ use vulkano::{
 	descriptor_set::DescriptorSet,
 };
 
-use crate::gfx::WGfx;
+use crate::{gfx::WGfx, renderer_vk::model_buffer};
 
 use super::{rect::RectPipeline, text::text_atlas::TextPipeline};
 
@@ -23,6 +23,8 @@ impl Viewport {
 	pub fn new(gfx: Arc<WGfx>) -> anyhow::Result<Self> {
 		let params = Params {
 			screen_resolution: [0, 0],
+			padding1: [0, 0],
+			models: [0.0; MODELS_F32_COUNT],
 		};
 
 		let params_buffer = gfx.new_buffer(
@@ -62,13 +64,22 @@ impl Viewport {
 			.clone()
 	}
 
-	/// Updates the `Viewport` with the given `resolution`.
-	pub fn update(&mut self, resolution: [u32; 2]) -> anyhow::Result<()> {
-		if self.params.screen_resolution != resolution {
-			self.params.screen_resolution = resolution;
+	pub fn set_resolution(&mut self, resolution: [u32; 2]) {
+		self.params.screen_resolution = resolution;
+	}
 
-			self.params_buffer.write()?.copy_from_slice(&[self.params]);
+	pub fn set_model_buffer(&mut self, buf: &model_buffer::ModelBuffer) {
+		unsafe {
+			std::ptr::copy_nonoverlapping::<f32>(
+				buf.models.as_slice().as_ptr() as *const f32,
+				self.params.models.as_mut_ptr(),
+				MODELS_F32_COUNT,
+			);
 		}
+	}
+
+	pub fn update(&mut self) -> anyhow::Result<()> {
+		self.params_buffer.write()?.copy_from_slice(&[self.params]);
 		Ok(())
 	}
 
@@ -78,8 +89,15 @@ impl Viewport {
 	}
 }
 
+const MODELS_F32_COUNT: usize = model_buffer::MAX_COUNT * (4 * 4);
+
 #[repr(C)]
-#[derive(BufferContents, Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(BufferContents, Clone, Copy, Debug, PartialEq)]
 pub(crate) struct Params {
+	// 0-3, 4 bytes
 	pub screen_resolution: [u32; 2],
+	pub padding1: [u32; 2], // data alignment (vec4 size)
+
+	// 4-2063, 2048 bytes
+	pub models: [f32; MODELS_F32_COUNT], // 2048 bytes, mat4 ModelBuffer array
 }

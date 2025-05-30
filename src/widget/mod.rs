@@ -20,6 +20,7 @@ pub struct WidgetState {
 	pub pressed: bool,
 	pub event_listeners: Vec<EventListener>,
 	pub scrolling: Vec2, // normalized, 0.0-1.0. Not used in case if overflow != scroll
+	pub model: glam::Mat4,
 	pub obj: Box<dyn WidgetObj>,
 }
 
@@ -31,6 +32,7 @@ impl WidgetState {
 			event_listeners: Vec::new(),
 			scrolling: Vec2::default(),
 			obj,
+			model: glam::Mat4::IDENTITY,
 		})
 	}
 }

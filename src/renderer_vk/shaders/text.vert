@@ -1,4 +1,6 @@
 #version 450
+#extension GL_GOOGLE_include_directive : enable
+
 precision highp float;
 
 layout(location = 0) in ivec2 in_pos;
@@ -15,9 +17,8 @@ layout(location = 2) flat out uint content_type;
 layout(set = 0, binding = 0) uniform sampler2D color_atlas;
 layout(set = 1, binding = 0) uniform sampler2D mask_atlas;
 
-layout(set = 2, binding = 0) uniform UniformParams {
-  uniform uvec2 screen_resolution;
-};
+#define UNIFORM_PARAMS_SET 2
+#include "uniform.glsl"
 
 float srgb_to_linear(float c) {
   if (c <= 0.04045) {
@@ -42,8 +43,8 @@ void main() {
   uv = uv + corner_offset;
   pos = pos + ivec2(corner_offset);
 
-  gl_Position =
-      vec4(2.0 * vec2(pos) / vec2(screen_resolution) - 1.0, depth, 1.0);
+  gl_Position = vec4(2.0 * vec2(pos) / vec2(uniforms.screen_resolution) - 1.0,
+                     depth, 1.0);
 
   content_type = content_type_with_srgb & 0xffffu;
   uint srgb = (content_type_with_srgb & 0xffff0000u) >> 16u;

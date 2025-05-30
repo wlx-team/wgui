@@ -1,13 +1,16 @@
 #version 450
+#extension GL_GOOGLE_include_directive : enable
+
 precision highp float;
 
-layout(location = 0) in ivec2 in_pos;
-layout(location = 1) in uint in_dim;
-layout(location = 2) in uint in_color;
-layout(location = 3) in uint in_color2;
-layout(location = 4) in uint in_border_color;
-layout(location = 5) in uint round_border_gradient_srgb;
-layout(location = 6) in float depth;
+layout(location = 0) in uint in_model_idx;
+layout(location = 1) in ivec2 in_pos;
+layout(location = 2) in uint in_dim;
+layout(location = 3) in uint in_color;
+layout(location = 4) in uint in_color2;
+layout(location = 5) in uint in_border_color;
+layout(location = 6) in uint round_border_gradient_srgb;
+layout(location = 7) in float depth;
 
 layout(location = 0) out vec4 out_color;
 layout(location = 1) out vec4 out_color2;
@@ -18,9 +21,8 @@ layout(location = 5) out float out_radius;
 layout(location = 6) out float out_rect_aspect;
 layout(location = 7) out float out_pixel_size;
 
-layout(set = 0, binding = 0) uniform UniformParams {
-  uniform uvec2 screen_resolution;
-};
+#define UNIFORM_PARAMS_SET 0
+#include "uniform.glsl"
 
 float srgb_to_linear(float c) {
   if (c <= 0.04045) {
@@ -47,8 +49,9 @@ void main() {
 
   out_rect_aspect = float(rect_width) / float(rect_height);
 
-  gl_Position =
-      vec4(2.0 * vec2(pos) / vec2(screen_resolution) - 1.0, depth, 1.0);
+  gl_Position = uniforms.models[in_model_idx] *
+                vec4(2.0 * vec2(pos) / vec2(uniforms.screen_resolution) - 1.0,
+                     depth, 1.0);
 
   out_border_color =
       vec4(float((in_border_color & 0x00ff0000u) >> 16u) / 255.0,

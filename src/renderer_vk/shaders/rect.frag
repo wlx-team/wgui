@@ -1,4 +1,6 @@
 #version 450
+#extension GL_GOOGLE_include_directive : enable
+
 precision highp float;
 
 layout(location = 0) in vec4 in_color;
@@ -12,9 +14,8 @@ layout(location = 7) in float in_pixel_size;
 
 layout(location = 0) out vec4 out_color;
 
-layout(set = 0, binding = 0) uniform UniformParams {
-  uniform uvec2 screen_resolution;
-};
+#define UNIFORM_PARAMS_SET 0
+#include "uniform.glsl"
 
 void main() {
   vec2 rect_dim = vec2(in_rect_aspect, 1.0);

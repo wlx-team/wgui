@@ -1,5 +1,6 @@
 use std::sync::Arc;
 
+use glam::{Vec3, Vec4};
 use vulkano::{
 	buffer::{BufferContents, BufferUsage, Subbuffer},
 	format::Format,
@@ -9,6 +10,7 @@ use vulkano::{
 use crate::{
 	drawing::{Boundary, Rectangle},
 	gfx::{BLEND_ALPHA, WGfx, cmd::GfxCommandBuffer, pipeline::WGfxPipeline},
+	renderer_vk::model_buffer::ModelBuffer,
 };
 
 use super::viewport::Viewport;
@@ -16,6 +18,8 @@ use super::viewport::Viewport;
 #[repr(C)]
 #[derive(BufferContents, Vertex, Copy, Clone, Debug)]
 pub struct RectVertex {
+	#[format(R32_UINT)]
+	pub in_model_idx: u32,
 	#[format(R32G32_SINT)]
 	pub in_pos: [i32; 2],
 	#[format(R32_UINT)]
@@ -62,10 +66,14 @@ pub struct RectRenderer {
 	rect_vertices: Vec<RectVertex>,
 	vert_buffer: Subbuffer<[RectVertex]>,
 	vert_buffer_size: usize,
+
+	model_buffer: ModelBuffer,
+
+	rot: f32,
 }
 
 impl RectRenderer {
-	pub fn new(pipeline: RectPipeline) -> anyhow::Result<Self> {
+	pub fn new(pipeline: RectPipeline, rot: f32) -> anyhow::Result<Self> {
 		const BUFFER_SIZE: usize = 128;
 
 		let vert_buffer = pipeline.gfx.empty_buffer(
@@ -78,11 +86,41 @@ impl RectRenderer {
 			rect_vertices: vec![],
 			vert_buffer,
 			vert_buffer_size: BUFFER_SIZE,
+			model_buffer: ModelBuffer::new(),
+			rot,
 		})
 	}
 
-	pub fn add_rect(&mut self, boundary: Boundary, rectangle: Rectangle, scale: f32, depth: f32) {
+	pub fn add_rect(
+		&mut self,
+		viewport: &Viewport,
+		boundary: Boundary,
+		rectangle: Rectangle,
+		scale: f32,
+		depth: f32,
+	) {
+		// TODO: use projection matrix instead of this abomination with positions and dimensions
+		let res = viewport.resolution();
+		let shift = Vec3::new(
+			(boundary.x + boundary.w / 2.0) / res[0] as f32,
+			(boundary.y + boundary.h / 2.0) / res[1] as f32,
+			0.0,
+		);
+		let vec_scale = Vec3::new(res[0] as f32 / res[1] as f32, 1.0, 1.0); // aspect
+		let vec_scale_inv = Vec3::new(res[1] as f32 / res[0] as f32, 1.0, 1.0); // inverse aspect
+
+		let mut model = glam::Mat4::IDENTITY;
+
+		model *= glam::Mat4::from_scale(vec_scale_inv);
+		model *= glam::Mat4::from_translation(-shift);
+		model *= glam::Mat4::from_rotation_z(self.rot + boundary.y);
+		model *= glam::Mat4::from_translation(shift);
+		model *= glam::Mat4::from_scale(vec_scale);
+
+		let in_model_idx = self.model_buffer.register(&model);
+
 		self.rect_vertices.push(RectVertex {
+			in_model_idx,
 			in_pos: [(boundary.x * scale) as _, (boundary.y * scale) as _],
 			in_dim: [(boundary.w * scale) as _, (boundary.h * scale) as _],
 			in_color: cosmic_text::Color::from(rectangle.color).0,
@@ -121,6 +159,9 @@ impl RectRenderer {
 		let vp = viewport.resolution();
 
 		let set0 = viewport.get_rect_descriptor(&self.pipeline);
+
+		viewport.set_model_buffer(&self.model_buffer);
+		viewport.update()?;
 
 		self.upload_verts()?;
 

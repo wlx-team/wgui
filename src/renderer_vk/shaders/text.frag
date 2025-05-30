@@ -1,4 +1,6 @@
 #version 310 es
+#extension GL_GOOGLE_include_directive : enable
+
 precision highp float;
 
 layout(location = 0) in vec4 in_color;

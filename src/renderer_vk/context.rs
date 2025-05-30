@@ -25,9 +25,13 @@ struct RendererPass<'a> {
 }
 
 impl RendererPass<'_> {
-	fn new(text_atlas: &mut TextAtlas, rect_pipeline: RectPipeline) -> anyhow::Result<Self> {
+	fn new(
+		text_atlas: &mut TextAtlas,
+		rect_pipeline: RectPipeline,
+		rot: f32,
+	) -> anyhow::Result<Self> {
 		let text_renderer = TextRenderer::new(text_atlas)?;
-		let rect_renderer = RectRenderer::new(rect_pipeline)?;
+		let rect_renderer = RectRenderer::new(rect_pipeline, rot)?;
 
 		Ok(Self {
 			submitted: false,
@@ -76,6 +80,7 @@ pub struct Context {
 	text_pipeline: TextPipeline,
 	scale: f32,
 	pub dirty: bool,
+	rot: f32,
 }
 
 impl Context {
@@ -96,6 +101,7 @@ impl Context {
 			text_pipeline,
 			scale,
 			dirty: true,
+			rot: 0.0,
 		})
 	}
 
@@ -113,7 +119,7 @@ impl Context {
 		if self.viewport.resolution() != resolution {
 			self.dirty = true;
 		}
-		self.viewport.update(resolution)?;
+		self.viewport.set_resolution(resolution);
 		Ok(())
 	}
 
@@ -121,6 +127,7 @@ impl Context {
 		passes.push(RendererPass::new(
 			&mut self.text_atlas,
 			self.rect_pipeline.clone(),
+			self.rot,
 		)?);
 
 		Ok(())
@@ -145,6 +152,7 @@ impl Context {
 		self.new_pass(&mut passes)?;
 
 		let empty_buffer = Buffer::new_empty(DEFAULT_METRICS);
+		self.rot += 0.01;
 
 		for primitive in primitives.iter() {
 			let pass = passes.last_mut().unwrap(); // always safe
@@ -157,7 +165,7 @@ impl Context {
 				drawing::RenderPrimitive::Rectangle(boundary, rectangle) => {
 					pass
 						.rect_renderer
-						.add_rect(*boundary, *rectangle, self.scale, 0.0);
+						.add_rect(&self.viewport, *boundary, *rectangle, self.scale, 0.0);
 				}
 				drawing::RenderPrimitive::Text(boundary, text) => {
 					pass.text_areas.push(TextArea {
