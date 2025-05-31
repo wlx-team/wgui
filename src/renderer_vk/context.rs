@@ -1,5 +1,7 @@
 use std::sync::Arc;
 
+use cosmic_text::{Attrs, Buffer, Shaping};
+
 use crate::{
 	drawing,
 	gfx::{WGfx, cmd::GfxCommandBuffer},
@@ -8,7 +10,7 @@ use crate::{
 use super::{
 	rect::{RectPipeline, RectRenderer},
 	text::{
-		FONT_SYSTEM, SWASH_CACHE, TextArea, TextBounds,
+		DEFAULT_METRICS, FONT_SYSTEM, SWASH_CACHE, TextArea, TextBounds,
 		text_atlas::{TextAtlas, TextPipeline},
 		text_renderer::TextRenderer,
 	},
@@ -142,6 +144,8 @@ impl Context {
 		let mut passes = Vec::<RendererPass>::new();
 		self.new_pass(&mut passes)?;
 
+		let empty_buffer = Buffer::new_empty(DEFAULT_METRICS);
+
 		for primitive in primitives.iter() {
 			let pass = passes.last_mut().unwrap(); // always safe
 
@@ -157,17 +161,28 @@ impl Context {
 				}
 				drawing::RenderPrimitive::Text(boundary, text) => {
 					pass.text_areas.push(TextArea {
-						buffer: text.get_buffer(),
+						buffer: text,
 						left: boundary.x * self.scale,
 						top: boundary.y * self.scale,
 						bounds: TextBounds::default(), //FIXME: just using boundary coords here doesn't work
 						scale: self.scale,
-						default_color: cosmic_text::Color::rgb(255, 0, 0),
+						default_color: cosmic_text::Color::rgb(0, 0, 0),
 						custom_glyphs: &[],
 						depth: 0.0, //FIXME: add depth info
 					});
 				}
-				drawing::RenderPrimitive::Image(_boundary, _image) => todo!(),
+				drawing::RenderPrimitive::Sprite(boundary, sprites) => {
+					pass.text_areas.push(TextArea {
+						buffer: &empty_buffer,
+						left: boundary.x * self.scale,
+						top: boundary.y * self.scale,
+						bounds: TextBounds::default(),
+						scale: self.scale,
+						custom_glyphs: sprites.as_slice(),
+						default_color: cosmic_text::Color::rgb(255, 0, 255),
+						depth: 0.0, //FIXME: add depth info
+					});
+				}
 			}
 		}
 

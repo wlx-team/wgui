@@ -82,7 +82,7 @@ pub(super) struct InnerAtlas {
 }
 
 impl InnerAtlas {
-	const INITIAL_SIZE: u32 = 256;
+	const INITIAL_SIZE: u32 = 1024;
 
 	fn new(common: TextPipeline, kind: Kind) -> anyhow::Result<Self> {
 		let max_texture_dimension_2d = common
@@ -184,7 +184,6 @@ impl InnerAtlas {
 		font_system: &mut FontSystem,
 		cache: &mut SwashCache,
 		scale_factor: f32,
-		mut rasterize_custom_glyph: impl FnMut(RasterizeCustomGlyphRequest) -> Option<RasterizedCustomGlyph>,
 	) -> anyhow::Result<bool> {
 		if self.size >= self.max_texture_dimension_2d {
 			return Ok(false);
@@ -196,6 +195,9 @@ impl InnerAtlas {
 		let new_size = (self.size * GROWTH_FACTOR).min(self.max_texture_dimension_2d);
 
 		self.packer.grow(size2(new_size as i32, new_size as i32));
+
+		let _old_image = self.image_view.image().clone();
+		//TODO: copy from old_image
 
 		let image = self.common.gfx.new_image(
 			new_size,
@@ -236,7 +238,7 @@ impl InnerAtlas {
 						scale: scale_factor,
 					};
 
-					let Some(rasterized_glyph) = (rasterize_custom_glyph)(input) else {
+					let Some(rasterized_glyph) = RasterizedCustomGlyph::try_from(input) else {
 						panic!(
 							"Custom glyph rasterizer returned `None` when it previously returned `Some` for the same input {:?}",
 							&input
@@ -403,19 +405,10 @@ impl TextAtlas {
 		cache: &mut SwashCache,
 		content_type: ContentType,
 		scale_factor: f32,
-		rasterize_custom_glyph: impl FnMut(RasterizeCustomGlyphRequest) -> Option<RasterizedCustomGlyph>,
 	) -> anyhow::Result<bool> {
 		let did_grow = match content_type {
-			ContentType::Mask => {
-				self
-					.mask_atlas
-					.grow(font_system, cache, scale_factor, rasterize_custom_glyph)?
-			}
-			ContentType::Color => {
-				self
-					.color_atlas
-					.grow(font_system, cache, scale_factor, rasterize_custom_glyph)?
-			}
+			ContentType::Mask => self.mask_atlas.grow(font_system, cache, scale_factor)?,
+			ContentType::Color => self.color_atlas.grow(font_system, cache, scale_factor)?,
 		};
 
 		if did_grow {

@@ -8,10 +8,14 @@ use taffy::{
 use crate::{
 	drawing::{self, GradientMode},
 	layout::{Layout, WidgetID},
-	renderer_vk::text::{FontWeight, HorizontalAlign},
+	renderer_vk::text::{
+		FontWeight, HorizontalAlign,
+		custom_glyph::{CustomGlyphType, register_custom_glyph},
+	},
 	widget::{
 		div::Div,
 		rectangle::{Rectangle, RectangleParams},
+		sprite::{SpriteBox, SpriteBoxParams},
 		text::{TextLabel, TextParams},
 	},
 };
@@ -455,6 +459,47 @@ fn parse_widget_rectangle<'a>(
 	Ok(())
 }
 
+fn parse_widget_sprite<'a>(
+	ctx: &mut ParserContext,
+	node: roxmltree::Node<'a, 'a>,
+	parent_id: WidgetID,
+) -> anyhow::Result<()> {
+	let mut params = SpriteBoxParams::default();
+
+	let mut glyph = None;
+	for attrib in node.attributes() {
+		let (key, value) = (attrib.name(), attrib.value());
+
+		#[allow(clippy::single_match)]
+		match key {
+			"src" => {
+				if value.ends_with(".svg") || value.ends_with(".svgz") {
+					glyph = Some(CustomGlyphType::SvgFile(value.into()));
+				} else {
+					glyph = Some(CustomGlyphType::ImageFile(value.into()));
+				}
+			}
+			_ => {}
+		}
+	}
+
+	let Some(glyph) = glyph else {
+		anyhow::bail!("No source for sprite node!");
+	};
+
+	params.glyph_id = register_custom_glyph(glyph);
+
+	let (new_id, _) =
+		ctx
+			.layout
+			.add_child(parent_id, SpriteBox::create(params)?, style_from_node(node))?;
+
+	parse_universal(ctx, node, new_id)?;
+	parse_children(ctx, node, new_id)?;
+
+	Ok(())
+}
+
 fn parse_widget_label<'a>(
 	ctx: &mut ParserContext,
 	node: roxmltree::Node<'a, 'a>,
@@ -556,6 +601,9 @@ fn parse_children<'a>(
 			}
 			"label" => {
 				parse_widget_label(ctx, child_node, parent_id)?;
+			}
+			"sprite" => {
+				parse_widget_sprite(ctx, child_node, parent_id)?;
 			}
 			_ => {}
 		}

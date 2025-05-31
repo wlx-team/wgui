@@ -1,4 +1,4 @@
-mod custom_glyph;
+pub mod custom_glyph;
 mod shaders;
 pub mod text_atlas;
 pub mod text_renderer;
@@ -25,6 +25,11 @@ const DEFAULT_FONT_SIZE: f32 = 14.;
 
 /// In case no line_height is defined, use font_size * DEFAULT_LINE_HEIGHT_RATIO
 const DEFAULT_LINE_HEIGHT_RATIO: f32 = 1.43;
+
+pub(super) const DEFAULT_METRICS: Metrics = Metrics::new(
+	DEFAULT_FONT_SIZE,
+	DEFAULT_FONT_SIZE * DEFAULT_LINE_HEIGHT_RATIO,
+);
 
 pub struct RenderableText {
 	buffer: Buffer,

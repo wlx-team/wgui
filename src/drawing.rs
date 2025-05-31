@@ -1,11 +1,10 @@
-use std::sync::Arc;
-
+use cosmic_text::Buffer;
 use glam::Vec2;
 use taffy::TraversePartialTree;
 
 use crate::{
 	layout::BoxWidget,
-	renderer_vk::text::RenderableText,
+	renderer_vk::text::custom_glyph::CustomGlyph,
 	transform_stack::{self, TransformStack},
 	widget,
 };
@@ -89,15 +88,11 @@ pub struct Rectangle {
 	pub round: f32, // 0.0 - 1.0
 }
 
-pub struct Image {
-	_handle: ImageHandle,
-}
-
 pub enum RenderPrimitive {
 	Submit,
 	Rectangle(Boundary, Rectangle),
-	Text(Boundary, Arc<RenderableText>),
-	Image(Boundary, Image),
+	Text(Boundary, Buffer),
+	Sprite(Boundary, Option<CustomGlyph>), //option because we want as_slice
 }
 
 fn draw_widget(

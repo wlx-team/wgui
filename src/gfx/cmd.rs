@@ -4,7 +4,7 @@ use vulkano::{
 	DeviceSize,
 	buffer::{Buffer, BufferContents, BufferCreateInfo, BufferUsage, Subbuffer},
 	command_buffer::{
-		AutoCommandBufferBuilder, CommandBufferExecFuture, CopyBufferToImageInfo,
+		AutoCommandBufferBuilder, CommandBufferExecFuture, CopyBufferToImageInfo, CopyImageInfo,
 		PrimaryAutoCommandBuffer, PrimaryCommandBufferAbstract, RenderingAttachmentInfo, RenderingInfo,
 		SubpassContents,
 	},
@@ -152,6 +152,26 @@ impl WCommandBuffer<CmdBufXfer> {
 		}
 
 		self.command_buffer.copy_buffer_to_image(copy_info)?;
+		Ok(())
+	}
+
+	pub fn copy_image(
+		&mut self,
+		src: Arc<Image>,
+		src_offset: [u32; 3],
+		dst: Arc<Image>,
+		dst_offset: [u32; 3],
+		extent: Option<[u32; 3]>,
+	) -> anyhow::Result<()> {
+		let mut copy_info = CopyImageInfo::images(src.clone(), dst.clone());
+
+		copy_info.regions[0].src_offset = src_offset;
+		copy_info.regions[0].dst_offset = dst_offset;
+		if let Some(extent) = extent {
+			copy_info.regions[0].extent = extent;
+		}
+
+		self.command_buffer.copy_image(copy_info)?;
 		Ok(())
 	}
 }

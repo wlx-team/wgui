@@ -19,6 +19,10 @@
       <rectangle width="400" height="300" round="0.5" id="my_div_parent" color="#FFCC99" align_items="center" align_content="flex_start" justify_content="center" flex_wrap="wrap" gap="8" padding="16" border="2" border_color="#ffffff">
         <!-- filled-in at runtime -->
       </rectangle>
+      <sprite width="32" height="32" src="/usr/share/icons/hicolor/32x32/apps/blueman.png" />
+      <sprite width="64" height="64" src="/usr/share/icons/hicolor/64x64/apps/blueman.png" />
+      <sprite width="128" height="128" src="/usr/share/icons/hicolor/128x128/apps/blueman.png" />
+      <sprite width="256" height="256" src="/usr/share/icons/nvtop.svg" />
     </div>
     <!-- 2/3 green rects -->
     <div width="100%" height="100%" flex_direction="column">

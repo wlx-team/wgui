@@ -47,40 +47,6 @@ impl TextRenderer {
 		text_areas: impl IntoIterator<Item = TextArea<'a>>,
 		cache: &mut SwashCache,
 	) -> anyhow::Result<()> {
-		self.prepare_with_depth_and_custom(font_system, atlas, viewport, text_areas, cache, |_| None)
-	}
-
-	/// Prepares all of the provided text areas for rendering.
-	pub fn prepare_with_custom<'a>(
-		&mut self,
-		font_system: &mut FontSystem,
-		atlas: &mut TextAtlas,
-		viewport: &Viewport,
-		text_areas: impl IntoIterator<Item = TextArea<'a>>,
-		cache: &mut SwashCache,
-		rasterize_custom_glyph: impl FnMut(RasterizeCustomGlyphRequest) -> Option<RasterizedCustomGlyph>,
-	) -> anyhow::Result<()> {
-		self.prepare_with_depth_and_custom(
-			font_system,
-			atlas,
-			viewport,
-			text_areas,
-			cache,
-			rasterize_custom_glyph,
-		)
-	}
-
-	/// Prepares all of the provided text areas for rendering.
-	#[allow(clippy::too_many_arguments)]
-	pub fn prepare_with_depth_and_custom<'a>(
-		&mut self,
-		font_system: &mut FontSystem,
-		atlas: &mut TextAtlas,
-		viewport: &Viewport,
-		text_areas: impl IntoIterator<Item = TextArea<'a>>,
-		cache: &mut SwashCache,
-		mut rasterize_custom_glyph: impl FnMut(RasterizeCustomGlyphRequest) -> Option<RasterizedCustomGlyph>,
-	) -> anyhow::Result<()> {
 		self.glyph_vertices.clear();
 
 		let resolution = viewport.resolution();
@@ -135,7 +101,7 @@ impl TextRenderer {
 					bounds_max_x,
 					bounds_max_y,
 					text_area.depth,
-					|_cache, _font_system, rasterize_custom_glyph| -> Option<GetGlyphImageResult> {
+					|_cache, _font_system| -> Option<GetGlyphImageResult> {
 						if width == 0 || height == 0 {
 							return None;
 						}
@@ -149,7 +115,7 @@ impl TextRenderer {
 							scale: text_area.scale,
 						};
 
-						let output = (rasterize_custom_glyph)(input)?;
+						let output = RasterizedCustomGlyph::try_from(input)?;
 
 						output.validate(&input, None);
 
@@ -162,7 +128,6 @@ impl TextRenderer {
 							data: output.data,
 						})
 					},
-					&mut rasterize_custom_glyph,
 				)? {
 					self.glyph_vertices.push(glyph_to_render);
 				}
@@ -205,7 +170,7 @@ impl TextRenderer {
 						bounds_max_x,
 						bounds_max_y,
 						text_area.depth,
-						|cache, font_system, _rasterize_custom_glyph| -> Option<GetGlyphImageResult> {
+						|cache, font_system| -> Option<GetGlyphImageResult> {
 							let image = cache.get_image_uncached(font_system, physical_glyph.cache_key)?;
 
 							let content_type = match image.content {
@@ -226,7 +191,6 @@ impl TextRenderer {
 								data: image.data,
 							})
 						},
-						&mut rasterize_custom_glyph,
 					)? {
 						self.glyph_vertices.push(glyph_to_render);
 					}
@@ -308,7 +272,7 @@ struct GetGlyphImageResult {
 }
 
 #[allow(clippy::too_many_arguments)]
-fn prepare_glyph<R>(
+fn prepare_glyph(
 	x: i32,
 	y: i32,
 	line_y: f32,
@@ -323,12 +287,8 @@ fn prepare_glyph<R>(
 	bounds_max_x: i32,
 	bounds_max_y: i32,
 	depth: f32,
-	get_glyph_image: impl FnOnce(&mut SwashCache, &mut FontSystem, &mut R) -> Option<GetGlyphImageResult>,
-	mut rasterize_custom_glyph: R,
-) -> anyhow::Result<Option<GlyphVertex>>
-where
-	R: FnMut(RasterizeCustomGlyphRequest) -> Option<RasterizedCustomGlyph>,
-{
+	get_glyph_image: impl FnOnce(&mut SwashCache, &mut FontSystem) -> Option<GetGlyphImageResult>,
+) -> anyhow::Result<Option<GlyphVertex>> {
 	let gfx = atlas.common.gfx.clone();
 	let details = if let Some(details) = atlas.mask_atlas.glyph_cache.get(&cache_key) {
 		atlas.mask_atlas.glyphs_in_use.insert(cache_key);
@@ -337,7 +297,7 @@ where
 		atlas.color_atlas.glyphs_in_use.insert(cache_key);
 		details
 	} else {
-		let Some(image) = (get_glyph_image)(cache, font_system, &mut rasterize_custom_glyph) else {
+		let Some(image) = (get_glyph_image)(cache, font_system) else {
 			return Ok(None);
 		};
 
@@ -351,13 +311,7 @@ where
 				match inner.try_allocate(image.width as usize, image.height as usize) {
 					Some(a) => break a,
 					None => {
-						if !atlas.grow(
-							font_system,
-							cache,
-							image.content_type,
-							scale_factor,
-							&mut rasterize_custom_glyph,
-						)? {
+						if !atlas.grow(font_system, cache, image.content_type, scale_factor)? {
 							anyhow::bail!(
 								"Atlas full. atlas: {:?} cache_key: {:?}",
 								image.content_type,

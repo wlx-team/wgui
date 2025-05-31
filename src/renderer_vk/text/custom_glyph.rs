@@ -1,6 +1,32 @@
-use cosmic_text::SubpixelBin;
+use std::{
+	f32,
+	sync::{LazyLock, Mutex},
+};
 
-pub type CustomGlyphId = u16;
+use cosmic_text::SubpixelBin;
+use image::{
+	ImageReader, RgbaImage,
+	imageops::{FilterType, resize},
+};
+use resvg::usvg::{Options, Tree};
+use slotmap::{SlotMap, new_key_type};
+
+new_key_type! { pub struct CustomGlyphId; }
+
+static CUSTOM_GLYPH_SOURCES: LazyLock<Mutex<SlotMap<CustomGlyphId, CustomGlyphType>>> =
+	LazyLock::new(|| Mutex::new(SlotMap::with_key()));
+
+pub enum CustomGlyphType {
+	Svg(Tree),
+	SvgFile(String),
+	Image(RgbaImage),
+	ImageFile(String),
+}
+
+pub fn register_custom_glyph(glyph: CustomGlyphType) -> CustomGlyphId {
+	let mut sources = CUSTOM_GLYPH_SOURCES.lock().unwrap(); // want panic
+	sources.insert(glyph)
+}
 
 /// A custom glyph to render
 #[derive(Default, Debug, Clone, Copy, PartialEq)]
@@ -62,6 +88,24 @@ pub struct RasterizedCustomGlyph {
 }
 
 impl RasterizedCustomGlyph {
+	pub(super) fn try_from(input: RasterizeCustomGlyphRequest) -> Option<RasterizedCustomGlyph> {
+		let sources = CUSTOM_GLYPH_SOURCES.lock().unwrap(); // want panic
+
+		match sources.get(input.id)? {
+			CustomGlyphType::Svg(tree) => rasterize_svg(tree, &input),
+			CustomGlyphType::Image(data) => rasterize_image(data, &input),
+			CustomGlyphType::SvgFile(path) => {
+				let data = std::fs::read(path).ok()?;
+				let tree = Tree::from_data(&data, &Options::default()).ok()?;
+				rasterize_svg(&tree, &input)
+			}
+			CustomGlyphType::ImageFile(path) => {
+				let image = ImageReader::open(path).ok()?.decode().ok()?.into_rgba8();
+				rasterize_image(&image, &input)
+			}
+		}
+	}
+
 	pub(super) fn validate(
 		&self,
 		input: &RasterizeCustomGlyphRequest,
@@ -117,4 +161,53 @@ impl ContentType {
 			Self::Mask => 1,
 		}
 	}
+}
+
+fn rasterize_svg(
+	tree: &Tree,
+	input: &RasterizeCustomGlyphRequest,
+) -> Option<RasterizedCustomGlyph> {
+	// Calculate the scale based on the "glyph size".
+	let svg_size = tree.size();
+	let scale_x = input.width as f32 / svg_size.width();
+	let scale_y = input.height as f32 / svg_size.height();
+
+	let mut pixmap = resvg::tiny_skia::Pixmap::new(input.width as u32, input.height as u32)?;
+	let mut transform = resvg::usvg::Transform::from_scale(scale_x, scale_y);
+
+	// Offset the glyph by the subpixel amount.
+	let offset_x = input.x_bin.as_float();
+	let offset_y = input.y_bin.as_float();
+	if offset_x != 0.0 || offset_y != 0.0 {
+		transform = transform.post_translate(offset_x, offset_y);
+	}
+
+	resvg::render(tree, transform, &mut pixmap.as_mut());
+
+	Some(RasterizedCustomGlyph {
+		data: pixmap.data().to_vec(),
+		content_type: ContentType::Color,
+	})
+}
+
+fn rasterize_image(
+	image: &RgbaImage,
+	input: &RasterizeCustomGlyphRequest,
+) -> Option<RasterizedCustomGlyph> {
+	let data = if image.width() == input.width as _ && image.height() == image.height() as _ {
+		image.to_vec()
+	} else {
+		let resized_image = resize(
+			image,
+			input.width as u32,
+			input.height as u32,
+			FilterType::Triangle,
+		);
+		resized_image.to_vec()
+	};
+
+	Some(RasterizedCustomGlyph {
+		data,
+		content_type: ContentType::Color,
+	})
 }

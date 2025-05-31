@@ -12,6 +12,7 @@ use crate::{
 
 pub mod div;
 pub mod rectangle;
+pub mod sprite;
 pub mod text;
 
 pub struct WidgetState {
