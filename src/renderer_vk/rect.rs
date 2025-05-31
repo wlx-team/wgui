@@ -157,11 +157,11 @@ impl RectRenderer {
 	) -> anyhow::Result<()> {
 		let vp = viewport.resolution();
 
-		let set0 = viewport.get_rect_descriptor(&self.pipeline);
-		let set1 = self.model_buffer.get_rect_descriptor(&self.pipeline);
-
 		self.model_buffer.upload(gfx)?;
 		self.upload_verts()?;
+
+		let set0 = viewport.get_rect_descriptor(&self.pipeline);
+		let set1 = self.model_buffer.get_rect_descriptor(&self.pipeline);
 
 		let pass = self.pipeline.color_rect.create_pass_instanced(
 			[vp[0] as _, vp[1] as _],
