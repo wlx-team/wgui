@@ -22,7 +22,15 @@ layout(location = 6) out float out_rect_aspect;
 layout(location = 7) out float out_pixel_size;
 
 #define UNIFORM_PARAMS_SET 0
+#define MODEL_BUFFER_SET 1
+
 #include "uniform.glsl"
+
+layout(std140, set = MODEL_BUFFER_SET,
+       binding = 0) readonly buffer ModelBuffer {
+  mat4 models[];
+}
+model_buffer;
 
 float srgb_to_linear(float c) {
   if (c <= 0.04045) {
@@ -49,7 +57,7 @@ void main() {
 
   out_rect_aspect = float(rect_width) / float(rect_height);
 
-  gl_Position = uniforms.models[in_model_idx] *
+  gl_Position = model_buffer.models[in_model_idx] *
                 vec4(2.0 * vec2(pos) / vec2(uniforms.screen_resolution) - 1.0,
                      depth, 1.0);
 

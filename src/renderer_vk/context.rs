@@ -43,6 +43,7 @@ impl RendererPass<'_> {
 
 	fn submit(
 		&mut self,
+		gfx: &Arc<WGfx>,
 		viewport: &mut Viewport,
 		cmd_buf: &mut GfxCommandBuffer,
 		text_atlas: &mut TextAtlas,
@@ -51,8 +52,7 @@ impl RendererPass<'_> {
 			return Ok(());
 		}
 		self.submitted = true;
-
-		self.rect_renderer.render(viewport, cmd_buf)?;
+		self.rect_renderer.render(gfx, viewport, cmd_buf)?;
 
 		{
 			let mut font_system = FONT_SYSTEM.lock().unwrap();
@@ -119,7 +119,7 @@ impl Context {
 		if self.viewport.resolution() != resolution {
 			self.dirty = true;
 		}
-		self.viewport.set_resolution(resolution);
+		self.viewport.update(resolution)?;
 		Ok(())
 	}
 
@@ -135,15 +135,17 @@ impl Context {
 
 	fn submit_pass(
 		&mut self,
+		gfx: &Arc<WGfx>,
 		cmd_buf: &mut GfxCommandBuffer,
 		pass: &mut RendererPass,
 	) -> anyhow::Result<()> {
-		pass.submit(&mut self.viewport, cmd_buf, &mut self.text_atlas)?;
+		pass.submit(gfx, &mut self.viewport, cmd_buf, &mut self.text_atlas)?;
 		Ok(())
 	}
 
 	pub fn draw(
 		&mut self,
+		gfx: &Arc<WGfx>,
 		cmd_buf: &mut GfxCommandBuffer,
 		primitives: &[drawing::RenderPrimitive],
 	) -> anyhow::Result<()> {
@@ -159,7 +161,7 @@ impl Context {
 
 			match primitive {
 				drawing::RenderPrimitive::Submit => {
-					self.submit_pass(cmd_buf, pass)?;
+					self.submit_pass(gfx, cmd_buf, pass)?;
 					self.new_pass(&mut passes)?;
 				}
 				drawing::RenderPrimitive::Rectangle(boundary, rectangle) => {
@@ -195,7 +197,7 @@ impl Context {
 		}
 
 		let pass = passes.last_mut().unwrap();
-		self.submit_pass(cmd_buf, pass)?;
+		self.submit_pass(gfx, cmd_buf, pass)?;
 
 		Ok(())
 	}

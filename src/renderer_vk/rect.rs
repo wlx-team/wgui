@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use glam::{Vec3, Vec4};
+use glam::Vec3;
 use vulkano::{
 	buffer::{BufferContents, BufferUsage, Subbuffer},
 	format::Format,
@@ -66,9 +66,7 @@ pub struct RectRenderer {
 	rect_vertices: Vec<RectVertex>,
 	vert_buffer: Subbuffer<[RectVertex]>,
 	vert_buffer_size: usize,
-
 	model_buffer: ModelBuffer,
-
 	rot: f32,
 }
 
@@ -82,11 +80,11 @@ impl RectRenderer {
 		)?;
 
 		Ok(Self {
+			model_buffer: ModelBuffer::new(&pipeline.gfx)?,
 			pipeline,
 			rect_vertices: vec![],
 			vert_buffer,
 			vert_buffer_size: BUFFER_SIZE,
-			model_buffer: ModelBuffer::new(),
 			rot,
 		})
 	}
@@ -153,16 +151,16 @@ impl RectRenderer {
 
 	pub fn render(
 		&mut self,
+		gfx: &Arc<WGfx>,
 		viewport: &mut Viewport,
 		cmd_buf: &mut GfxCommandBuffer,
 	) -> anyhow::Result<()> {
 		let vp = viewport.resolution();
 
 		let set0 = viewport.get_rect_descriptor(&self.pipeline);
+		let set1 = self.model_buffer.get_rect_descriptor(&self.pipeline);
 
-		viewport.set_model_buffer(&self.model_buffer);
-		viewport.update()?;
-
+		self.model_buffer.upload(gfx)?;
 		self.upload_verts()?;
 
 		let pass = self.pipeline.color_rect.create_pass_instanced(
@@ -170,7 +168,7 @@ impl RectRenderer {
 			self.vert_buffer.clone(),
 			0..4,
 			0..self.rect_vertices.len() as _,
-			vec![set0],
+			vec![set0, set1],
 		)?;
 
 		self.rect_vertices.clear();

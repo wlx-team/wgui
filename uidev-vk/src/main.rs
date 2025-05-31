@@ -263,7 +263,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 					cmd_buf.begin_rendering(tgt).unwrap();
 
 					let primitives = wgui::drawing::draw(&testbed.layout).unwrap();
-					render_context.draw(&mut cmd_buf, &primitives).unwrap();
+					render_context
+						.draw(&gfx, &mut cmd_buf, &primitives)
+						.unwrap();
 
 					cmd_buf.end_rendering().unwrap();
 
