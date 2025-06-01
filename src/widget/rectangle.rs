@@ -26,16 +26,17 @@ impl Rectangle {
 
 impl WidgetObj for Rectangle {
 	fn draw(&mut self, state: &mut super::DrawState, _params: &super::DrawParams) {
-		state.primitives.push(drawing::RenderPrimitive::Rectangle(
-			drawing::Boundary::construct(state.transform_stack),
-			drawing::Rectangle {
+		state.primitives.push(drawing::RenderPrimitive {
+			boundary: drawing::Boundary::construct(state.transform_stack),
+			depth: state.depth,
+			payload: drawing::PrimitivePayload::Rectangle(drawing::Rectangle {
 				color: self.params.color,
 				color2: self.params.color2,
 				gradient: self.params.gradient,
 				border: self.params.border,
 				border_color: self.params.border_color,
 				round: self.params.round,
-			},
-		));
+			}),
+		});
 	}
 }

@@ -76,10 +76,11 @@ impl WidgetObj for TextLabel {
 			buffer.set_size(&mut font_system, Some(boundary.w), Some(boundary.h));
 		}
 
-		state.primitives.push(drawing::RenderPrimitive::Text(
+		state.primitives.push(drawing::RenderPrimitive {
 			boundary,
-			self.buffer.clone(),
-		));
+			depth: state.depth,
+			payload: drawing::PrimitivePayload::Text(self.buffer.clone()),
+		});
 	}
 
 	fn measure(
@@ -98,9 +99,6 @@ impl WidgetObj for TextLabel {
 		let mut buffer = self.buffer.borrow_mut();
 
 		buffer.set_size(&mut font_system, width_constraint, None);
-
-		// Compute layout
-		buffer.shape_until_scroll(&mut font_system, false);
 
 		// Determine measured size of text
 		let (width, total_lines) = buffer

@@ -149,38 +149,34 @@ impl Context {
 		for primitive in primitives.iter() {
 			let pass = passes.last_mut().unwrap(); // always safe
 
-			match primitive {
-				drawing::RenderPrimitive::Submit => {
-					self.submit_pass(cmd_buf, pass)?;
-					self.new_pass(&mut passes)?;
-				}
-				drawing::RenderPrimitive::Rectangle(boundary, rectangle) => {
+			match &primitive.payload {
+				drawing::PrimitivePayload::Rectangle(rectangle) => {
 					pass
 						.rect_renderer
-						.add_rect(*boundary, *rectangle, self.scale, 0.0);
+						.add_rect(primitive.boundary, *rectangle, self.scale, primitive.depth);
 				}
-				drawing::RenderPrimitive::Text(boundary, text) => {
+				drawing::PrimitivePayload::Text(text) => {
 					pass.text_areas.push(TextArea {
 						buffer: text.clone(),
-						left: boundary.x * self.scale,
-						top: boundary.y * self.scale,
+						left: primitive.boundary.x * self.scale,
+						top: primitive.boundary.y * self.scale,
 						bounds: TextBounds::default(), //FIXME: just using boundary coords here doesn't work
 						scale: self.scale,
 						default_color: cosmic_text::Color::rgb(0, 0, 0),
 						custom_glyphs: &[],
-						depth: 0.0, //FIXME: add depth info
+						depth: primitive.depth,
 					});
 				}
-				drawing::RenderPrimitive::Sprite(boundary, sprites) => {
+				drawing::PrimitivePayload::Sprite(sprites) => {
 					pass.text_areas.push(TextArea {
 						buffer: self.empty_text.clone(),
-						left: boundary.x * self.scale,
-						top: boundary.y * self.scale,
+						left: primitive.boundary.x * self.scale,
+						top: primitive.boundary.y * self.scale,
 						bounds: TextBounds::default(),
 						scale: self.scale,
 						custom_glyphs: sprites.as_slice(),
 						default_color: cosmic_text::Color::rgb(255, 0, 255),
-						depth: 0.0, //FIXME: add depth info
+						depth: primitive.depth,
 					});
 				}
 			}

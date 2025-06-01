@@ -43,9 +43,11 @@ impl WidgetObj for SpriteBox {
 				snap_to_physical_pixel: true,
 			};
 
-			state
-				.primitives
-				.push(drawing::RenderPrimitive::Sprite(boundary, Some(glyph)));
+			state.primitives.push(drawing::RenderPrimitive {
+				boundary,
+				depth: state.depth,
+				payload: drawing::PrimitivePayload::Sprite(Some(glyph)),
+			});
 		} else {
 			// Source not set or not available, display error text
 			let mut buffer = Buffer::new_empty(DEFAULT_METRICS);
@@ -60,10 +62,11 @@ impl WidgetObj for SpriteBox {
 				// set text last in order to avoid expensive re-shaping
 				buffer.set_text("Error", &attrs, Shaping::Basic);
 			}
-			state.primitives.push(drawing::RenderPrimitive::Text(
+			state.primitives.push(drawing::RenderPrimitive {
 				boundary,
-				Rc::new(RefCell::new(buffer)),
-			));
+				depth: state.depth,
+				payload: drawing::PrimitivePayload::Text(Rc::new(RefCell::new(buffer))),
+			});
 		};
 	}
 
