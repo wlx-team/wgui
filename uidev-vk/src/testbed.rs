@@ -3,11 +3,10 @@ use std::{cell::RefCell, rc::Rc};
 use glam::{Mat4, Vec3};
 use wgui::{
 	drawing::{self},
-	event::{EventListener, WidgetCallback},
+	event::EventListener,
 	glam::Vec2,
 	layout::Layout,
 	renderer_vk::text::TextStyle,
-	widget::rectangle::Rectangle,
 };
 
 pub struct Testbed {
