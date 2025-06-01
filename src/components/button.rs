@@ -65,7 +65,7 @@ fn anim_hover_in(button: Arc<Button>, widget_id: WidgetID) -> Animation {
 			rect.params.color.g = button.color.g + brightness;
 			rect.params.color.b = button.color.b + brightness;
 			rect.params.border_color = Color::new(1.0, 1.0, 1.0, 1.0);
-			rect.params.border = 1.0 + data.pos * 2.0;
+			rect.params.border = 1.0 + data.pos;
 			data.needs_redraw = true;
 		}),
 	)

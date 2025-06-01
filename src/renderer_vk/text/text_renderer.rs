@@ -9,7 +9,7 @@ use super::{
 	text_atlas::{ColorMode, GlyphVertex, TextAtlas, TextPipeline},
 };
 use cosmic_text::{Color, SubpixelBin, SwashContent};
-use glam::{Mat4, Vec2};
+use glam::{Mat4, Vec2, Vec3};
 use vulkano::{
 	buffer::{BufferUsage, Subbuffer},
 	command_buffer::CommandBufferUsage,
@@ -96,6 +96,7 @@ impl TextRenderer {
 
 				if let Some(glyph_to_render) = prepare_glyph(
 					PrepareGlyphParams {
+						label_pos: Vec2::new(text_area.left, text_area.top),
 						x,
 						y,
 						line_y: 0.0,
@@ -171,6 +172,7 @@ impl TextRenderer {
 
 					if let Some(glyph_to_render) = prepare_glyph(
 						PrepareGlyphParams {
+							label_pos: Vec2::new(text_area.left, text_area.top),
 							x: physical_glyph.x,
 							y: physical_glyph.y,
 							line_y: run.line_y,
@@ -294,6 +296,7 @@ struct GetGlyphImageResult {
 }
 
 struct PrepareGlyphParams<'a> {
+	label_pos: Vec2,
 	x: i32,
 	y: i32,
 	line_y: f32,
@@ -447,14 +450,31 @@ fn prepare_glyph(
 		glyph_height = par.bounds_max_y - y;
 	}
 
-	let in_model_idx = par.model_buffer.register_pos_size(
-		&Vec2::new(x as f32 / par.scale_factor, y as f32 / par.scale_factor),
-		&Vec2::new(
-			glyph_width as f32 / par.scale_factor,
-			glyph_height as f32 / par.scale_factor,
-		),
-		par.transform,
-	);
+	let mut model = Mat4::IDENTITY;
+
+	// top-left text transform
+	model *= Mat4::from_translation(Vec3::new(
+		par.label_pos.x / par.scale_factor,
+		par.label_pos.y / par.scale_factor,
+		0.0,
+	));
+
+	model *= *par.transform;
+
+	// per-character transform
+	model *= Mat4::from_translation(Vec3::new(
+		((x as f32) - par.label_pos.x) / par.scale_factor,
+		((y as f32) - par.label_pos.y) / par.scale_factor,
+		0.0,
+	));
+
+	model *= glam::Mat4::from_scale(Vec3::new(
+		glyph_width as f32 / par.scale_factor,
+		glyph_height as f32 / par.scale_factor,
+		0.0,
+	));
+
+	let in_model_idx = par.model_buffer.register(&model);
 
 	Ok(Some(GlyphVertex {
 		in_model_idx,

@@ -1,6 +1,7 @@
 use std::{cell::RefCell, rc::Rc, sync::Arc};
 
 use cosmic_text::Buffer;
+use glam::{Mat4, Vec2, Vec3};
 
 use crate::{
 	drawing,
@@ -117,18 +118,28 @@ impl Context {
 			self.dirty = true;
 		}
 
-		let near = -1.0;
-		let far = 1.0;
-		let projection = glam::Mat4::orthographic_rh(
-			0.0,
-			(resolution[0] as f32) / pixel_scale,
-			0.0,
-			(resolution[1] as f32) / pixel_scale,
-			near,
-			far,
+		let size = Vec2::new(
+			resolution[0] as f32 / pixel_scale,
+			resolution[1] as f32 / pixel_scale,
 		);
 
-		self.viewport.update(resolution, &projection, pixel_scale)?;
+		let fov = 0.4;
+		let aspect_ratio = size.x / size.y;
+		let projection = Mat4::perspective_rh(fov, aspect_ratio, 1.0, 100000.0);
+
+		let b = size.y / 2.0;
+		let angle_half = fov / 2.0;
+		let distance = (std::f32::consts::PI / 2.0 - angle_half).tan() * b;
+
+		let view = Mat4::look_at_rh(
+			Vec3::new(size.x / 2.0, size.y / 2.0, distance),
+			Vec3::new(size.x / 2.0, size.y / 2.0, 0.0),
+			Vec3::new(0.0, 1.0, 0.0),
+		);
+
+		let fin = projection * view;
+
+		self.viewport.update(resolution, &fin, pixel_scale)?;
 		Ok(())
 	}
 

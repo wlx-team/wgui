@@ -5,13 +5,15 @@ use wgui::{
 	drawing::{self},
 	event::EventListener,
 	glam::Vec2,
-	layout::Layout,
+	layout::{Layout, WidgetID},
 	renderer_vk::text::TextStyle,
 };
 
 pub struct Testbed {
 	pub layout: Layout,
 	pub scale: f32,
+	rot: f32,
+	widget_id: Rc<RefCell<Option<WidgetID>>>,
 }
 
 impl Testbed {
@@ -58,22 +60,39 @@ impl Testbed {
 			},
 		)?;
 
-		let rotation = Rc::new(RefCell::new(0.0));
+		let widget_id = Rc::new(RefCell::new(None));
 
+		let wid = widget_id.clone();
 		layout.add_event_listener(
 			button.body,
 			EventListener::MouseClick(Box::new(move |data| {
 				button.set_text(data, "Congratulations!");
-				*rotation.borrow_mut() += 0.15;
-				data.widget_data.transform = Mat4::from_rotation_z(-*rotation.borrow())
-					* Mat4::from_scale(Vec3::splat(1.0 + *rotation.borrow() + 0.1));
+				*wid.borrow_mut() = Some(data.widget_id);
 			})),
 		);
 
-		Ok(Self { layout, scale: 1.5 })
+		Ok(Self {
+			layout,
+			scale: 1.5,
+			rot: 0.0,
+			widget_id,
+		})
 	}
 
 	pub fn update(&mut self, width: f32, height: f32, timestep_alpha: f32) -> anyhow::Result<()> {
+		if let Some(widget_id) = *self.widget_id.borrow() {
+			self.rot += 0.01;
+
+			let a = self.layout.widget_states.get(widget_id).unwrap();
+			let mut widget = a.lock().unwrap();
+			widget.data.transform = Mat4::IDENTITY
+				* Mat4::from_rotation_y(-self.rot)
+				* Mat4::from_rotation_x(self.rot * 0.25)
+				* Mat4::from_rotation_z(-self.rot * 0.1);
+
+			self.layout.needs_redraw = true;
+		}
+
 		self
 			.layout
 			.update(Vec2::new(width, height), timestep_alpha)?;
