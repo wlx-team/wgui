@@ -42,6 +42,7 @@ pub struct DrawState<'a> {
 	pub layout: &'a Layout,
 	pub primitives: &'a mut Vec<RenderPrimitive>,
 	pub transform_stack: &'a mut TransformStack,
+	pub depth: f32, //TODO: actually use this in shader
 }
 
 // per-widget draw params
@@ -163,30 +164,32 @@ impl WidgetState {
 
 		// Horizontal handle
 		if enabled_horiz && info.handle_size.x < 1.0 {
-			state.primitives.push(drawing::RenderPrimitive::Rectangle(
-				drawing::Boundary::from_pos_size(
+			state.primitives.push(drawing::RenderPrimitive {
+				boundary: drawing::Boundary::from_pos_size(
 					&Vec2::new(
 						transform.pos.x + transform.dim.x * (1.0 - info.handle_size.x) * self.scrolling.x,
 						transform.pos.y + transform.dim.y - thickness - margin,
 					),
 					&Vec2::new(transform.dim.x * info.handle_size.x, thickness),
 				),
-				rect_params,
-			));
+				depth: state.depth,
+				payload: drawing::PrimitivePayload::Rectangle(rect_params),
+			});
 		}
 
 		// Vertical handle
 		if enabled_vert && info.handle_size.y < 1.0 {
-			state.primitives.push(drawing::RenderPrimitive::Rectangle(
-				drawing::Boundary::from_pos_size(
+			state.primitives.push(drawing::RenderPrimitive {
+				boundary: drawing::Boundary::from_pos_size(
 					&Vec2::new(
 						transform.pos.x + transform.dim.x - thickness - margin,
 						transform.pos.y + transform.dim.y * (1.0 - info.handle_size.y) * self.scrolling.y,
 					),
 					&Vec2::new(thickness, transform.dim.y * info.handle_size.y),
 				),
-				rect_params,
-			));
+				depth: state.depth,
+				payload: drawing::PrimitivePayload::Rectangle(rect_params),
+			});
 		}
 	}
 
@@ -264,7 +267,7 @@ impl WidgetState {
 		let mut data = CallbackData {
 			obj: self.obj.as_mut(),
 			widgets: params.widgets,
-			animations: &mut params.animations,
+			animations: params.animations,
 			widget_id,
 			node_id,
 			needs_redraw: false,

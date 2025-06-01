@@ -90,11 +90,16 @@ pub struct Rectangle {
 	pub round: f32, // 0.0 - 1.0
 }
 
-pub enum RenderPrimitive {
-	Submit,
-	Rectangle(Boundary, Rectangle),
-	Text(Boundary, Rc<RefCell<Buffer>>),
-	Sprite(Boundary, Option<CustomGlyph>), //option because we want as_slice
+pub struct RenderPrimitive {
+	pub(super) boundary: Boundary,
+	pub(super) depth: f32,
+	pub(super) payload: PrimitivePayload,
+}
+
+pub enum PrimitivePayload {
+	Rectangle(Rectangle),
+	Text(Rc<RefCell<Buffer>>),
+	Sprite(Option<CustomGlyph>), //option because we want as_slice
 }
 
 fn draw_widget(
@@ -155,7 +160,9 @@ fn draw_children(layout: &Layout, state: &mut DrawState, parent_node_id: taffy::
 			continue;
 		};
 
+		state.depth += 0.01;
 		draw_widget(layout, state, node_id, style, widget);
+		state.depth -= 0.01;
 	}
 }
 
@@ -175,6 +182,7 @@ pub fn draw(layout: &Layout) -> anyhow::Result<Vec<RenderPrimitive>> {
 		primitives: &mut primitives,
 		transform_stack: &mut transform_stack,
 		layout,
+		depth: 0.0,
 	};
 
 	draw_widget(layout, &mut params, layout.root_node, style, root_widget);

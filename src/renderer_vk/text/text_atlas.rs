@@ -81,7 +81,7 @@ pub(super) struct InnerAtlas {
 }
 
 impl InnerAtlas {
-	const INITIAL_SIZE: u32 = 32;
+	const INITIAL_SIZE: u32 = 256;
 
 	fn new(common: TextPipeline, kind: Kind) -> anyhow::Result<Self> {
 		let max_texture_dimension_2d = common
