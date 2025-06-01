@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use glam::{Vec2, Vec3};
+use glam::Vec2;
 use vulkano::{
 	buffer::{BufferContents, BufferUsage, Subbuffer},
 	format::Format,

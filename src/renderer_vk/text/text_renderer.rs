@@ -1,5 +1,5 @@
 use crate::{
-	gfx::cmd::GfxCommandBuffer,
+	gfx::cmd::{GfxCommandBuffer, XferCommandBuffer},
 	renderer_vk::{model_buffer::ModelBuffer, viewport::Viewport},
 };
 
@@ -57,6 +57,8 @@ impl TextRenderer {
 
 		let resolution = viewport.resolution();
 
+		let mut cmd_buf = None;
+
 		for text_area in text_areas {
 			let bounds_min_x = text_area.bounds.left.max(0);
 			let bounds_min_y = text_area.bounds.top.max(0);
@@ -110,6 +112,7 @@ impl TextRenderer {
 						bounds_max_y,
 						depth: text_area.depth,
 					},
+					&mut cmd_buf,
 					|_cache, _font_system| -> Option<GetGlyphImageResult> {
 						if width == 0 || height == 0 {
 							return None;
@@ -183,6 +186,7 @@ impl TextRenderer {
 							bounds_max_y,
 							depth: text_area.depth,
 						},
+						&mut cmd_buf,
 						|cache, font_system| -> Option<GetGlyphImageResult> {
 							let image = cache.get_image_uncached(font_system, physical_glyph.cache_key)?;
 
@@ -214,6 +218,10 @@ impl TextRenderer {
 		let will_render = !self.glyph_vertices.is_empty();
 		if !will_render {
 			return Ok(());
+		}
+
+		if let Some(cmd_buf) = cmd_buf {
+			cmd_buf.build_and_execute_now()?; //TODO: do not wait for fence here?
 		}
 
 		let vertices = self.glyph_vertices.as_slice();
@@ -308,6 +316,7 @@ struct PrepareGlyphParams<'a> {
 #[allow(clippy::too_many_arguments)]
 fn prepare_glyph(
 	par: PrepareGlyphParams,
+	cmd_buf: &mut Option<XferCommandBuffer>,
 	get_glyph_image: impl FnOnce(&mut SwashCache, &mut FontSystem) -> Option<GetGlyphImageResult>,
 ) -> anyhow::Result<Option<GlyphVertex>> {
 	let gfx = par.atlas.common.gfx.clone();
@@ -349,16 +358,18 @@ fn prepare_glyph(
 			};
 			let atlas_min = allocation.rectangle.min;
 
-			let mut cmd_buf = gfx.create_xfer_command_buffer(CommandBufferUsage::OneTimeSubmit)?;
-
-			cmd_buf.update_image(
-				inner.image_view.image().clone(),
-				&image.data,
-				[atlas_min.x as _, atlas_min.y as _, 0],
-				Some([image.width as _, image.height as _, 1]),
-			)?;
-
-			cmd_buf.build_and_execute_now()?; //TODO: do not wait for fence here
+			cmd_buf
+				.get_or_insert_with(|| {
+					gfx
+						.create_xfer_command_buffer(CommandBufferUsage::OneTimeSubmit)
+						.unwrap() // want panic
+				})
+				.update_image(
+					inner.image_view.image().clone(),
+					&image.data,
+					[atlas_min.x as _, atlas_min.y as _, 0],
+					Some([image.width as _, image.height as _, 1]),
+				)?;
 
 			(
 				GpuCacheStatus::InAtlas {
