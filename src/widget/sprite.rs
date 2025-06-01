@@ -37,8 +37,8 @@ impl WidgetObj for SpriteBox {
 				data: glyph_data.clone(),
 				left: 0.0,
 				top: 0.0,
-				width: boundary.w,
-				height: boundary.h,
+				width: boundary.size.x,
+				height: boundary.size.y,
 				color: Some(cosmic_text::Color::rgb(255, 255, 255)),
 				snap_to_physical_pixel: true,
 			};
@@ -47,6 +47,7 @@ impl WidgetObj for SpriteBox {
 				boundary,
 				depth: state.depth,
 				payload: drawing::PrimitivePayload::Sprite(Some(glyph)),
+				transform: state.transform_stack.get().transform,
 			});
 		} else {
 			// Source not set or not available, display error text
@@ -66,6 +67,7 @@ impl WidgetObj for SpriteBox {
 				boundary,
 				depth: state.depth,
 				payload: drawing::PrimitivePayload::Text(Rc::new(RefCell::new(buffer))),
+				transform: state.transform_stack.get().transform,
 			});
 		};
 	}

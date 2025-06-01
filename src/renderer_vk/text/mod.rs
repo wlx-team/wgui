@@ -14,6 +14,7 @@ use cosmic_text::{
 };
 use custom_glyph::{ContentType, CustomGlyph};
 use etagere::AllocId;
+use glam::Mat4;
 
 use crate::drawing::{self};
 
@@ -219,4 +220,6 @@ pub struct TextArea<'a> {
 	pub custom_glyphs: &'a [CustomGlyph],
 	/// Distance from camera, 0.0..=1.0
 	pub depth: f32,
+	/// Text transformation
+	pub transform: Mat4,
 }

@@ -73,13 +73,18 @@ impl WidgetObj for TextLabel {
 			self.last_boundary = boundary;
 			let mut font_system = FONT_SYSTEM.lock().unwrap(); // safe unwrap
 			let mut buffer = self.buffer.borrow_mut();
-			buffer.set_size(&mut font_system, Some(boundary.w), Some(boundary.h));
+			buffer.set_size(
+				&mut font_system,
+				Some(boundary.size.x),
+				Some(boundary.size.y),
+			);
 		}
 
 		state.primitives.push(drawing::RenderPrimitive {
 			boundary,
 			depth: state.depth,
 			payload: drawing::PrimitivePayload::Text(self.buffer.clone()),
+			transform: state.transform_stack.get().transform,
 		});
 	}
 

@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use glam::Vec3;
+use glam::{Mat4, Vec3};
 use vulkano::{
 	buffer::{BufferUsage, Subbuffer},
 	descriptor_set::DescriptorSet,
@@ -96,9 +96,14 @@ impl ModelBuffer {
 		ret
 	}
 
-	pub fn register_pos_size(&mut self, pos: &glam::Vec2, size: &glam::Vec2) -> u32 {
-		let mut model = glam::Mat4::IDENTITY;
-		model *= glam::Mat4::from_translation(Vec3::new(pos.x, pos.y, 0.0));
+	pub fn register_pos_size(
+		&mut self,
+		pos: &glam::Vec2,
+		size: &glam::Vec2,
+		transform: &Mat4,
+	) -> u32 {
+		let mut model = glam::Mat4::from_translation(Vec3::new(pos.x, pos.y, 0.0));
+		model *= *transform;
 		model *= glam::Mat4::from_scale(Vec3::new(size.x, size.y, 1.0));
 		self.register(&model)
 	}

@@ -29,6 +29,7 @@ impl WidgetObj for Rectangle {
 		state.primitives.push(drawing::RenderPrimitive {
 			boundary: drawing::Boundary::construct(state.transform_stack),
 			depth: state.depth,
+			transform: state.transform_stack.get().transform,
 			payload: drawing::PrimitivePayload::Rectangle(drawing::Rectangle {
 				color: self.params.color,
 				color2: self.params.color2,

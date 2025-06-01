@@ -1,7 +1,7 @@
 use std::{cell::RefCell, rc::Rc};
 
 use cosmic_text::Buffer;
-use glam::Vec2;
+use glam::{Mat4, Vec2};
 use taffy::TraversePartialTree;
 
 use crate::{
@@ -19,30 +19,21 @@ pub struct ImageHandle {
 
 #[derive(Debug, Default, Clone, Copy, PartialEq)]
 pub struct Boundary {
-	pub x: f32,
-	pub y: f32,
-	pub w: f32,
-	pub h: f32,
+	pub pos: Vec2,
+	pub size: Vec2,
 }
 
 impl Boundary {
-	pub fn from_pos_size(pos: &Vec2, size: &Vec2) -> Self {
-		Self {
-			x: pos.x,
-			y: pos.y,
-			w: size.x,
-			h: size.y,
-		}
+	pub fn from_pos_size(pos: Vec2, size: Vec2) -> Self {
+		Self { pos, size }
 	}
 
 	pub fn construct(transform_stack: &TransformStack) -> Self {
 		let transform = transform_stack.get();
 
 		Self {
-			x: transform.pos.x,
-			y: transform.pos.y,
-			w: transform.dim.x,
-			h: transform.dim.y,
+			pos: Vec2::new(transform.pos.x, transform.pos.y),
+			size: Vec2::new(transform.dim.x, transform.dim.y),
 		}
 	}
 }
@@ -92,6 +83,7 @@ pub struct Rectangle {
 
 pub struct RenderPrimitive {
 	pub(super) boundary: Boundary,
+	pub(super) transform: Mat4,
 	pub(super) depth: f32,
 	pub(super) payload: PrimitivePayload,
 }
@@ -108,6 +100,7 @@ fn draw_widget(
 	node_id: taffy::NodeId,
 	style: &taffy::Style,
 	widget: &BoxWidget,
+	parent_transform: &glam::Mat4,
 ) {
 	let Ok(l) = layout.tree.layout(node_id) else {
 		debug_assert!(false);
@@ -116,6 +109,8 @@ fn draw_widget(
 
 	let mut widget_state = widget.lock().unwrap();
 
+	let transform = widget_state.data.transform * *parent_transform;
+
 	let (shift, info) = match widget::get_scrollbar_info(l) {
 		Some(info) => (widget_state.get_scroll_shift(&info, l), Some(info)),
 		None => (Vec2::default(), None),
@@ -123,6 +118,7 @@ fn draw_widget(
 
 	state.transform_stack.push(transform_stack::Transform {
 		pos: Vec2::new(l.location.x, l.location.y) - shift,
+		transform,
 		dim: Vec2::new(l.size.width, l.size.height),
 	});
 
@@ -134,7 +130,7 @@ fn draw_widget(
 
 	widget_state.draw_all(state, &draw_params);
 
-	draw_children(layout, state, node_id);
+	draw_children(layout, state, node_id, &transform);
 
 	state.transform_stack.pop();
 
@@ -143,7 +139,12 @@ fn draw_widget(
 	}
 }
 
-fn draw_children(layout: &Layout, state: &mut DrawState, parent_node_id: taffy::NodeId) {
+fn draw_children(
+	layout: &Layout,
+	state: &mut DrawState,
+	parent_node_id: taffy::NodeId,
+	model: &glam::Mat4,
+) {
 	for node_id in layout.tree.child_ids(parent_node_id) {
 		let Some(widget_id) = layout.tree.get_node_context(node_id).cloned() else {
 			debug_assert!(false);
@@ -161,7 +162,7 @@ fn draw_children(layout: &Layout, state: &mut DrawState, parent_node_id: taffy::
 		};
 
 		state.depth += 0.01;
-		draw_widget(layout, state, node_id, style, widget);
+		draw_widget(layout, state, node_id, style, widget, model);
 		state.depth -= 0.01;
 	}
 }
@@ -169,6 +170,7 @@ fn draw_children(layout: &Layout, state: &mut DrawState, parent_node_id: taffy::
 pub fn draw(layout: &Layout) -> anyhow::Result<Vec<RenderPrimitive>> {
 	let mut primitives = Vec::<RenderPrimitive>::new();
 	let mut transform_stack = TransformStack::new();
+	let model = glam::Mat4::IDENTITY;
 
 	let Some(root_widget) = layout.widget_states.get(layout.root_widget) else {
 		panic!();
@@ -185,7 +187,14 @@ pub fn draw(layout: &Layout) -> anyhow::Result<Vec<RenderPrimitive>> {
 		depth: 0.0,
 	};
 
-	draw_widget(layout, &mut params, layout.root_node, style, root_widget);
+	draw_widget(
+		layout,
+		&mut params,
+		layout.root_node,
+		style,
+		root_widget,
+		&model,
+	);
 
 	Ok(primitives)
 }

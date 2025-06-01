@@ -3,17 +3,9 @@ use glam::Vec2;
 #[derive(Default, Copy, Clone)]
 pub struct Transform {
 	pub pos: Vec2,
+	pub transform: glam::Mat4,
 
 	pub dim: Vec2, // for convenience
-}
-
-impl Transform {
-	pub fn pos(pos: Vec2) -> Transform {
-		Transform {
-			pos,
-			dim: Default::default(),
-		}
-	}
 }
 
 const TRANSFORM_STACK_MAX: usize = 64;

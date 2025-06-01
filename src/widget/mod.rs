@@ -15,24 +15,29 @@ pub mod rectangle;
 pub mod sprite;
 pub mod text;
 
-pub struct WidgetState {
+pub struct WidgetData {
 	pub hovered: bool,
 	pub pressed: bool,
-	pub event_listeners: Vec<EventListener>,
 	pub scrolling: Vec2, // normalized, 0.0-1.0. Not used in case if overflow != scroll
-	pub model: glam::Mat4,
+	pub transform: glam::Mat4,
+}
+pub struct WidgetState {
+	pub data: WidgetData,
 	pub obj: Box<dyn WidgetObj>,
+	pub event_listeners: Vec<EventListener>,
 }
 
 impl WidgetState {
 	fn new(obj: Box<dyn WidgetObj>) -> anyhow::Result<WidgetState> {
 		Ok(Self {
-			hovered: false,
-			pressed: false,
+			data: WidgetData {
+				hovered: false,
+				pressed: false,
+				scrolling: Vec2::default(),
+				transform: glam::Mat4::IDENTITY,
+			},
 			event_listeners: Vec::new(),
-			scrolling: Vec2::default(),
 			obj,
-			model: glam::Mat4::IDENTITY,
 		})
 	}
 }
@@ -130,8 +135,8 @@ impl WidgetState {
 
 	pub fn get_scroll_shift(&self, info: &ScrollbarInfo, l: &taffy::Layout) -> Vec2 {
 		Vec2::new(
-			(info.content_size.x - l.content_box_width()) * self.scrolling.x,
-			(info.content_size.y - l.content_box_height()) * self.scrolling.y,
+			(info.content_size.x - l.content_box_width()) * self.data.scrolling.x,
+			(info.content_size.y - l.content_box_height()) * self.data.scrolling.y,
 		)
 	}
 
@@ -167,13 +172,14 @@ impl WidgetState {
 		if enabled_horiz && info.handle_size.x < 1.0 {
 			state.primitives.push(drawing::RenderPrimitive {
 				boundary: drawing::Boundary::from_pos_size(
-					&Vec2::new(
-						transform.pos.x + transform.dim.x * (1.0 - info.handle_size.x) * self.scrolling.x,
+					Vec2::new(
+						transform.pos.x + transform.dim.x * (1.0 - info.handle_size.x) * self.data.scrolling.x,
 						transform.pos.y + transform.dim.y - thickness - margin,
 					),
-					&Vec2::new(transform.dim.x * info.handle_size.x, thickness),
+					Vec2::new(transform.dim.x * info.handle_size.x, thickness),
 				),
 				depth: state.depth,
+				transform: transform.transform,
 				payload: drawing::PrimitivePayload::Rectangle(rect_params),
 			});
 		}
@@ -182,13 +188,14 @@ impl WidgetState {
 		if enabled_vert && info.handle_size.y < 1.0 {
 			state.primitives.push(drawing::RenderPrimitive {
 				boundary: drawing::Boundary::from_pos_size(
-					&Vec2::new(
+					Vec2::new(
 						transform.pos.x + transform.dim.x - thickness - margin,
-						transform.pos.y + transform.dim.y * (1.0 - info.handle_size.y) * self.scrolling.y,
+						transform.pos.y + transform.dim.y * (1.0 - info.handle_size.y) * self.data.scrolling.y,
 					),
-					&Vec2::new(thickness, transform.dim.y * info.handle_size.y),
+					Vec2::new(thickness, transform.dim.y * info.handle_size.y),
 				),
 				depth: state.depth,
+				transform: transform.transform,
 				payload: drawing::PrimitivePayload::Rectangle(rect_params),
 			});
 		}
@@ -215,9 +222,9 @@ impl WidgetState {
 		if info.handle_size.x < 1.0 && wheel.pos.x != 0.0 {
 			// Horizontal scrolling
 			let mult = (1.0 / (l.content_box_width() - info.content_size.x)) * step_pixels;
-			let new_scroll = (self.scrolling.x + wheel.shift.x * mult).clamp(0.0, 1.0);
-			if self.scrolling.x != new_scroll {
-				self.scrolling.x = new_scroll;
+			let new_scroll = (self.data.scrolling.x + wheel.shift.x * mult).clamp(0.0, 1.0);
+			if self.data.scrolling.x != new_scroll {
+				self.data.scrolling.x = new_scroll;
 				*params.needs_redraw = true;
 			}
 		}
@@ -225,9 +232,9 @@ impl WidgetState {
 		if info.handle_size.y < 1.0 && wheel.pos.y != 0.0 {
 			// Vertical scrolling
 			let mult = (1.0 / (l.content_box_height() - info.content_size.y)) * step_pixels;
-			let new_scroll = (self.scrolling.y + wheel.shift.y * mult).clamp(0.0, 1.0);
-			if self.scrolling.y != new_scroll {
-				self.scrolling.y = new_scroll;
+			let new_scroll = (self.data.scrolling.y + wheel.shift.y * mult).clamp(0.0, 1.0);
+			if self.data.scrolling.y != new_scroll {
+				self.data.scrolling.y = new_scroll;
 				*params.needs_redraw = true;
 			}
 		}
@@ -247,14 +254,14 @@ impl WidgetState {
 		let mut just_clicked = false;
 		match &event {
 			Event::MouseDown(_) => {
-				if self.hovered {
-					self.pressed = true;
+				if self.data.hovered {
+					self.data.pressed = true;
 				}
 			}
 			Event::MouseUp(_) => {
-				if self.pressed {
-					self.pressed = false;
-					just_clicked = self.hovered;
+				if self.data.pressed {
+					self.data.pressed = false;
+					just_clicked = self.data.hovered;
 				}
 			}
 			Event::MouseWheel(e) => {
@@ -265,42 +272,68 @@ impl WidgetState {
 			_ => {}
 		}
 
-		let mut data = CallbackData {
-			obj: self.obj.as_mut(),
-			widgets: params.widgets,
-			animations: params.animations,
-			dirty_nodes: params.dirty_nodes,
-			widget_id,
-			node_id,
-			needs_redraw: false,
-		};
-
+		// TODO: simplify this behemoth, I gave up arguing with the compiler
 		for listener in &self.event_listeners {
 			match listener {
 				EventListener::MouseEnter(callback) => {
-					if hovered && !self.hovered {
+					if hovered && !self.data.hovered {
+						let mut data = CallbackData {
+							obj: self.obj.as_mut(),
+							widget_data: &mut self.data,
+							widgets: params.widgets,
+							animations: params.animations,
+							dirty_nodes: params.dirty_nodes,
+							widget_id,
+							node_id,
+							needs_redraw: false,
+						};
 						callback(&mut data);
+						if data.needs_redraw {
+							*params.needs_redraw = true;
+						}
 					}
 				}
 				EventListener::MouseLeave(callback) => {
-					if !hovered && self.hovered {
+					if !hovered && self.data.hovered {
+						let mut data = CallbackData {
+							obj: self.obj.as_mut(),
+							widget_data: &mut self.data,
+							widgets: params.widgets,
+							animations: params.animations,
+							dirty_nodes: params.dirty_nodes,
+							widget_id,
+							node_id,
+							needs_redraw: false,
+						};
 						callback(&mut data);
+						if data.needs_redraw {
+							*params.needs_redraw = true;
+						}
 					}
 				}
 				EventListener::MouseClick(callback) => {
 					if just_clicked {
+						let mut data = CallbackData {
+							obj: self.obj.as_mut(),
+							widget_data: &mut self.data,
+							widgets: params.widgets,
+							animations: params.animations,
+							dirty_nodes: params.dirty_nodes,
+							widget_id,
+							node_id,
+							needs_redraw: false,
+						};
 						callback(&mut data);
+						if data.needs_redraw {
+							*params.needs_redraw = true;
+						}
 					}
 				}
 			}
 		}
 
-		if data.needs_redraw {
-			*params.needs_redraw = true;
-		}
-
-		if self.hovered != hovered {
-			self.hovered = hovered;
+		if self.data.hovered != hovered {
+			self.data.hovered = hovered;
 		}
 
 		EventResult::Pass

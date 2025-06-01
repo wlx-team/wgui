@@ -166,32 +166,37 @@ impl Context {
 
 			match &primitive.payload {
 				drawing::PrimitivePayload::Rectangle(rectangle) => {
-					pass
-						.rect_renderer
-						.add_rect(primitive.boundary, *rectangle, primitive.depth);
+					pass.rect_renderer.add_rect(
+						primitive.boundary,
+						*rectangle,
+						&primitive.transform,
+						primitive.depth,
+					);
 				}
 				drawing::PrimitivePayload::Text(text) => {
 					pass.text_areas.push(TextArea {
 						buffer: text.clone(),
-						left: primitive.boundary.x * self.pixel_scale,
-						top: primitive.boundary.y * self.pixel_scale,
+						left: primitive.boundary.pos.x * self.pixel_scale,
+						top: primitive.boundary.pos.y * self.pixel_scale,
 						bounds: TextBounds::default(), //FIXME: just using boundary coords here doesn't work
 						scale: self.pixel_scale,
 						default_color: cosmic_text::Color::rgb(0, 0, 0),
 						custom_glyphs: &[],
 						depth: primitive.depth,
+						transform: primitive.transform,
 					});
 				}
 				drawing::PrimitivePayload::Sprite(sprites) => {
 					pass.text_areas.push(TextArea {
 						buffer: self.empty_text.clone(),
-						left: primitive.boundary.x * self.pixel_scale,
-						top: primitive.boundary.y * self.pixel_scale,
+						left: primitive.boundary.pos.x * self.pixel_scale,
+						top: primitive.boundary.pos.y * self.pixel_scale,
 						bounds: TextBounds::default(),
 						scale: self.pixel_scale,
 						custom_glyphs: sprites.as_slice(),
 						default_color: cosmic_text::Color::rgb(255, 0, 255),
 						depth: primitive.depth,
+						transform: primitive.transform,
 					});
 				}
 			}

@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use glam::{Vec2, Vec3};
+use glam::Mat4;
 use vulkano::{
 	buffer::{BufferContents, BufferUsage, Subbuffer},
 	format::Format,
@@ -85,15 +85,21 @@ impl RectRenderer {
 		})
 	}
 
-	pub fn add_rect(&mut self, boundary: Boundary, rectangle: Rectangle, depth: f32) {
-		let in_model_idx = self.model_buffer.register_pos_size(
-			&Vec2::new(boundary.x, boundary.y),
-			&Vec2::new(boundary.w, boundary.h),
-		);
+	pub fn add_rect(
+		&mut self,
+		boundary: Boundary,
+		rectangle: Rectangle,
+		transform: &Mat4,
+		depth: f32,
+	) {
+		let in_model_idx =
+			self
+				.model_buffer
+				.register_pos_size(&boundary.pos, &boundary.size, transform);
 
 		self.rect_vertices.push(RectVertex {
 			in_model_idx,
-			in_rect_dim: [boundary.w as u16, boundary.h as u16],
+			in_rect_dim: [boundary.size.x as u16, boundary.size.y as u16],
 			in_color: cosmic_text::Color::from(rectangle.color).0,
 			in_color2: cosmic_text::Color::from(rectangle.color2).0,
 			in_border_color: cosmic_text::Color::from(rectangle.border_color).0,

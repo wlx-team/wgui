@@ -122,6 +122,7 @@ impl Layout {
 		let transform = Transform {
 			pos: Vec2::new(l.location.x, l.location.y),
 			dim: Vec2::new(l.size.width, l.size.height),
+			transform: glam::Mat4::IDENTITY, // TODO: event transformations? Not needed for now
 		};
 
 		state.transform_stack.push(transform);

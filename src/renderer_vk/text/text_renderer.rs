@@ -9,7 +9,7 @@ use super::{
 	text_atlas::{ColorMode, GlyphVertex, TextAtlas, TextPipeline},
 };
 use cosmic_text::{Color, SubpixelBin, SwashContent};
-use glam::Vec2;
+use glam::{Mat4, Vec2};
 use vulkano::{
 	buffer::{BufferUsage, Subbuffer},
 	command_buffer::CommandBufferUsage,
@@ -109,6 +109,7 @@ impl TextRenderer {
 						bounds_max_x,
 						bounds_max_y,
 						depth: text_area.depth,
+						transform: &text_area.transform,
 					},
 					|_cache, _font_system| -> Option<GetGlyphImageResult> {
 						if width == 0 || height == 0 {
@@ -182,6 +183,7 @@ impl TextRenderer {
 							bounds_max_x,
 							bounds_max_y,
 							depth: text_area.depth,
+							transform: &text_area.transform,
 						},
 						|cache, font_system| -> Option<GetGlyphImageResult> {
 							let image = cache.get_image_uncached(font_system, physical_glyph.cache_key)?;
@@ -297,6 +299,7 @@ struct PrepareGlyphParams<'a> {
 	cache: &'a mut SwashCache,
 	font_system: &'a mut FontSystem,
 	model_buffer: &'a mut ModelBuffer,
+	transform: &'a Mat4,
 	scale_factor: f32,
 	bounds_min_x: i32,
 	bounds_min_y: i32,
@@ -445,6 +448,7 @@ fn prepare_glyph(
 			glyph_width as f32 / par.scale_factor,
 			glyph_height as f32 / par.scale_factor,
 		),
+		par.transform,
 	);
 
 	Ok(Some(GlyphVertex {

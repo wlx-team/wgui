@@ -4,7 +4,7 @@ use crate::{
 	animation,
 	layout::{WidgetID, WidgetMap},
 	transform_stack::Transform,
-	widget::WidgetObj,
+	widget::{WidgetData, WidgetObj},
 };
 
 // TODO: mouse index
@@ -74,6 +74,7 @@ pub trait WidgetCallback<'a> {
 
 pub struct CallbackData<'a> {
 	pub obj: &'a mut dyn WidgetObj,
+	pub widget_data: &'a mut WidgetData,
 	pub animations: &'a mut Vec<animation::Animation>,
 	pub widgets: &'a WidgetMap,
 	pub widget_id: WidgetID,

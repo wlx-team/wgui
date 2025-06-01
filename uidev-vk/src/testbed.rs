@@ -1,10 +1,13 @@
-use wgui::widget::text::TextLabel;
+use std::{cell::RefCell, rc::Rc};
+
+use glam::{Mat4, Vec3};
 use wgui::{
 	drawing::{self},
-	event::EventListener,
+	event::{EventListener, WidgetCallback},
 	glam::Vec2,
 	layout::Layout,
 	renderer_vk::text::TextStyle,
+	widget::rectangle::Rectangle,
 };
 
 pub struct Testbed {
@@ -56,10 +59,15 @@ impl Testbed {
 			},
 		)?;
 
+		let rotation = Rc::new(RefCell::new(0.0));
+
 		layout.add_event_listener(
 			button.body,
 			EventListener::MouseClick(Box::new(move |data| {
 				button.set_text(data, "Congratulations!");
+				*rotation.borrow_mut() += 0.15;
+				data.widget_data.transform = Mat4::from_rotation_z(-*rotation.borrow())
+					* Mat4::from_scale(Vec3::splat(1.0 + *rotation.borrow() + 0.1));
 			})),
 		);
 
