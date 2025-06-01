@@ -229,13 +229,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
 				if !render_context.dirty && !testbed.layout.check_toggle_needs_redraw() {
 					// no need to redraw
-					// FIXME: uncomment later
-					//std::thread::sleep(std::time::Duration::from_millis(5)); // dirty fix to prevent cpu burning precious cycles doing a busy loop
-					// return;
+					std::thread::sleep(std::time::Duration::from_millis(5)); // dirty fix to prevent cpu burning precious cycles doing a busy loop
+					return;
 				}
-
-				// FIXME: remove later
-				std::thread::sleep(std::time::Duration::from_millis(5));
 
 				log::info!("drawing frame {}", frame_index);
 				frame_index += 1;

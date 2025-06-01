@@ -1,11 +1,15 @@
 use std::sync::Arc;
 
+use glam::Vec3;
 use vulkano::{
 	buffer::{BufferContents, BufferUsage, Subbuffer},
 	descriptor_set::DescriptorSet,
 };
 
-use crate::{gfx, renderer_vk::rect::RectPipeline};
+use crate::{
+	gfx,
+	renderer_vk::{rect::RectPipeline, text::text_atlas::TextPipeline},
+};
 
 pub struct ModelBuffer {
 	idx: u32,
@@ -54,7 +58,7 @@ impl ModelBuffer {
 				BufferUsage::STORAGE_BUFFER | BufferUsage::TRANSFER_DST,
 				required_capacity_f32 as _,
 			)?;
-			log::info!("resized to {}", required_capacity_f32);
+			//log::info!("resized to {}", required_capacity_f32);
 		}
 
 		//safe
@@ -72,17 +76,17 @@ impl ModelBuffer {
 
 	// Returns model matrix ID from the model
 	pub fn register(&mut self, model: &glam::Mat4) -> u32 {
-		for (idx, iter_model) in self.models.iter().enumerate() {
+		/*for (idx, iter_model) in self.models.iter().enumerate() {
 			if iter_model == model {
 				return idx as u32;
 			}
-		}
+		}*/
 
 		if self.idx == self.models.len() as u32 {
 			self
 				.models
 				.resize(self.models.len() * 2, Default::default());
-			log::info!("ModelBuffer: resized to {}", self.models.len());
+			//log::info!("ModelBuffer: resized to {}", self.models.len());
 		}
 
 		// insert new
@@ -92,10 +96,24 @@ impl ModelBuffer {
 		ret
 	}
 
+	pub fn register_pos_size(&mut self, pos: &glam::Vec2, size: &glam::Vec2) -> u32 {
+		let mut model = glam::Mat4::IDENTITY;
+		model *= glam::Mat4::from_translation(Vec3::new(pos.x, pos.y, 0.0));
+		model *= glam::Mat4::from_scale(Vec3::new(size.x, size.y, 1.0));
+		self.register(&model)
+	}
+
 	pub fn get_rect_descriptor(&mut self, pipeline: &RectPipeline) -> Arc<DescriptorSet> {
 		self
 			.rect_descriptor
 			.get_or_insert_with(|| pipeline.color_rect.buffer(1, self.buffer.clone()).unwrap())
+			.clone()
+	}
+
+	pub fn get_text_descriptor(&mut self, pipeline: &TextPipeline) -> Arc<DescriptorSet> {
+		self
+			.rect_descriptor
+			.get_or_insert_with(|| pipeline.inner.buffer(3, self.buffer.clone()).unwrap())
 			.clone()
 	}
 }

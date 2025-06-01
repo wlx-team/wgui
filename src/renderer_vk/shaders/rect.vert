@@ -4,13 +4,12 @@
 precision highp float;
 
 layout(location = 0) in uint in_model_idx;
-layout(location = 1) in ivec2 in_pos;
-layout(location = 2) in uint in_dim;
-layout(location = 3) in uint in_color;
-layout(location = 4) in uint in_color2;
-layout(location = 5) in uint in_border_color;
-layout(location = 6) in uint round_border_gradient_srgb;
-layout(location = 7) in float depth;
+layout(location = 1) in uint in_rect_dim;
+layout(location = 2) in uint in_color;
+layout(location = 3) in uint in_color2;
+layout(location = 4) in uint in_border_color;
+layout(location = 5) in uint round_border_gradient_srgb;
+layout(location = 6) in float depth;
 
 layout(location = 0) out vec4 out_color;
 layout(location = 1) out vec4 out_color2;
@@ -18,19 +17,13 @@ layout(location = 2) out vec2 out_uv;
 layout(location = 3) out vec4 out_border_color;
 layout(location = 4) out float out_border_size;
 layout(location = 5) out float out_radius;
-layout(location = 6) out float out_rect_aspect;
-layout(location = 7) out float out_pixel_size;
+layout(location = 6) out vec2 out_rect_size;
 
 #define UNIFORM_PARAMS_SET 0
 #define MODEL_BUFFER_SET 1
 
+#include "model_buffer.glsl"
 #include "uniform.glsl"
-
-layout(std140, set = MODEL_BUFFER_SET,
-       binding = 0) readonly buffer ModelBuffer {
-  mat4 models[];
-}
-model_buffer;
 
 float srgb_to_linear(float c) {
   if (c <= 0.04045) {
@@ -41,25 +34,23 @@ float srgb_to_linear(float c) {
 }
 
 void main() {
-  ivec2 pos = in_pos;
-  uint rect_width = in_dim & 0xffffu;
-  uint rect_height = (in_dim & 0xffff0000u) >> 16u;
+  uint v = uint(gl_VertexIndex); // 0-3
+  uint rect_width = in_rect_dim & 0xffffu;
+  uint rect_height = (in_rect_dim & 0xffff0000u) >> 16u;
+  vec2 rect_size = vec2(float(rect_width), float(rect_height));
+  float rect_aspect = rect_size.x / rect_size.y;
 
-  out_pixel_size = 1.0 / float(rect_height);
+  // 0.0 - 1.0 normalized
+  uvec2 corner_pos_u = uvec2(v & 1u, (v >> 1u) & 1u);
+  vec2 corner_pos = vec2(corner_pos_u);
+  out_uv = corner_pos;
 
-  uint v = uint(gl_VertexIndex);
+  mat4 model_matrix = model_buffer.models[in_model_idx];
 
-  uvec2 corner_position = uvec2(v & 1u, (v >> 1u) & 1u);
-  out_uv = vec2(corner_position);
+  out_rect_size = rect_size;
 
-  uvec2 corner_offset = uvec2(rect_width, rect_height) * corner_position;
-  pos = pos + ivec2(corner_offset);
-
-  out_rect_aspect = float(rect_width) / float(rect_height);
-
-  gl_Position = model_buffer.models[in_model_idx] *
-                vec4(2.0 * vec2(pos) / vec2(uniforms.screen_resolution) - 1.0,
-                     depth, 1.0);
+  gl_Position =
+      uniforms.projection * model_matrix * vec4(corner_pos, depth, 1.0);
 
   out_border_color =
       vec4(float((in_border_color & 0x00ff0000u) >> 16u) / 255.0,
@@ -67,13 +58,12 @@ void main() {
            float(in_border_color & 0x000000ffu) / 255.0,
            float((in_border_color & 0xff000000u) >> 24u) / 255.0);
 
-  out_radius = min((float(round_border_gradient_srgb & 0xffu) / 255.0),
-                   out_rect_aspect) /
-               2.0;
+  float radius = min((float(round_border_gradient_srgb & 0xffu) / 255.0),
+                     rect_aspect);         // 0.0 - 1.0
+  out_radius = radius * rect_size.y / 2.0; // radius in units
 
   float border_size = float((round_border_gradient_srgb & 0xff00u) >> 8);
-
-  out_border_size = border_size / float(rect_height);
+  out_border_size = border_size;
 
   uint gradient_mode = (round_border_gradient_srgb & 0x00ff0000u) >> 16;
 
@@ -82,12 +72,12 @@ void main() {
   switch (gradient_mode) {
   case 1:
     // horizontal
-    color = corner_position.x > 0u ? in_color2 : in_color;
+    color = corner_pos_u.x > 0u ? in_color2 : in_color;
     color2 = color;
     break;
   case 2:
     // vertical
-    color = corner_position.y > 0u ? in_color2 : in_color;
+    color = corner_pos_u.y > 0u ? in_color2 : in_color;
     color2 = color;
     break;
   case 3:

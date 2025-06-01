@@ -25,13 +25,9 @@ struct RendererPass<'a> {
 }
 
 impl RendererPass<'_> {
-	fn new(
-		text_atlas: &mut TextAtlas,
-		rect_pipeline: RectPipeline,
-		rot: f32,
-	) -> anyhow::Result<Self> {
+	fn new(text_atlas: &mut TextAtlas, rect_pipeline: RectPipeline) -> anyhow::Result<Self> {
 		let text_renderer = TextRenderer::new(text_atlas)?;
-		let rect_renderer = RectRenderer::new(rect_pipeline, rot)?;
+		let rect_renderer = RectRenderer::new(rect_pipeline)?;
 
 		Ok(Self {
 			submitted: false,
@@ -78,16 +74,15 @@ pub struct Context {
 	text_atlas: TextAtlas,
 	rect_pipeline: RectPipeline,
 	text_pipeline: TextPipeline,
-	scale: f32,
+	pixel_scale: f32,
 	pub dirty: bool,
-	rot: f32,
 }
 
 impl Context {
 	pub fn new(
 		gfx: Arc<WGfx>,
 		native_format: vulkano::format::Format,
-		scale: f32,
+		pixel_scale: f32,
 	) -> anyhow::Result<Self> {
 		let rect_pipeline = RectPipeline::new(gfx.clone(), native_format)?;
 		let text_pipeline = TextPipeline::new(gfx.clone(), native_format)?;
@@ -99,9 +94,8 @@ impl Context {
 			text_atlas,
 			rect_pipeline,
 			text_pipeline,
-			scale,
+			pixel_scale,
 			dirty: true,
-			rot: 0.0,
 		})
 	}
 
@@ -111,15 +105,28 @@ impl Context {
 		Ok(())
 	}
 
-	pub fn update_viewport(&mut self, resolution: [u32; 2], scale: f32) -> anyhow::Result<()> {
-		if self.scale != scale {
-			self.scale = scale;
+	pub fn update_viewport(&mut self, resolution: [u32; 2], pixel_scale: f32) -> anyhow::Result<()> {
+		if self.pixel_scale != pixel_scale {
+			self.pixel_scale = pixel_scale;
 			self.regen()?;
 		}
+
 		if self.viewport.resolution() != resolution {
 			self.dirty = true;
 		}
-		self.viewport.update(resolution)?;
+
+		let near = -1.0;
+		let far = 1.0;
+		let projection = glam::Mat4::orthographic_rh(
+			0.0,
+			(resolution[0] as f32) / pixel_scale,
+			0.0,
+			(resolution[1] as f32) / pixel_scale,
+			near,
+			far,
+		);
+
+		self.viewport.update(resolution, &projection, pixel_scale)?;
 		Ok(())
 	}
 
@@ -127,7 +134,6 @@ impl Context {
 		passes.push(RendererPass::new(
 			&mut self.text_atlas,
 			self.rect_pipeline.clone(),
-			self.rot,
 		)?);
 
 		Ok(())
@@ -154,7 +160,6 @@ impl Context {
 		self.new_pass(&mut passes)?;
 
 		let empty_buffer = Buffer::new_empty(DEFAULT_METRICS);
-		self.rot += 0.01;
 
 		for primitive in primitives.iter() {
 			let pass = passes.last_mut().unwrap(); // always safe
@@ -165,17 +170,15 @@ impl Context {
 					self.new_pass(&mut passes)?;
 				}
 				drawing::RenderPrimitive::Rectangle(boundary, rectangle) => {
-					pass
-						.rect_renderer
-						.add_rect(&self.viewport, *boundary, *rectangle, self.scale, 0.0);
+					pass.rect_renderer.add_rect(*boundary, *rectangle, 0.0);
 				}
 				drawing::RenderPrimitive::Text(boundary, text) => {
 					pass.text_areas.push(TextArea {
 						buffer: text,
-						left: boundary.x * self.scale,
-						top: boundary.y * self.scale,
+						left: boundary.x * self.pixel_scale,
+						top: boundary.y * self.pixel_scale,
 						bounds: TextBounds::default(), //FIXME: just using boundary coords here doesn't work
-						scale: self.scale,
+						scale: self.pixel_scale,
 						default_color: cosmic_text::Color::rgb(0, 0, 0),
 						custom_glyphs: &[],
 						depth: 0.0, //FIXME: add depth info
@@ -184,10 +187,10 @@ impl Context {
 				drawing::RenderPrimitive::Sprite(boundary, sprites) => {
 					pass.text_areas.push(TextArea {
 						buffer: &empty_buffer,
-						left: boundary.x * self.scale,
-						top: boundary.y * self.scale,
+						left: boundary.x * self.pixel_scale,
+						top: boundary.y * self.pixel_scale,
 						bounds: TextBounds::default(),
-						scale: self.scale,
+						scale: self.pixel_scale,
 						custom_glyphs: sprites.as_slice(),
 						default_color: cosmic_text::Color::rgb(255, 0, 255),
 						depth: 0.0, //FIXME: add depth info

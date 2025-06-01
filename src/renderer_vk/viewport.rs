@@ -5,7 +5,7 @@ use vulkano::{
 	descriptor_set::DescriptorSet,
 };
 
-use crate::gfx::WGfx;
+use crate::{gfx::WGfx, renderer_vk::util::WMat4};
 
 use super::{rect::RectPipeline, text::text_atlas::TextPipeline};
 
@@ -23,6 +23,9 @@ impl Viewport {
 	pub fn new(gfx: Arc<WGfx>) -> anyhow::Result<Self> {
 		let params = Params {
 			screen_resolution: [0, 0],
+			pixel_scale: 1.0,
+			padding1: [0.0],
+			projection: WMat4::default(),
 		};
 
 		let params_buffer = gfx.new_buffer(
@@ -62,12 +65,24 @@ impl Viewport {
 			.clone()
 	}
 
-	/// Updates the `Viewport` with the given `resolution`.
-	pub fn update(&mut self, resolution: [u32; 2]) -> anyhow::Result<()> {
-		if self.params.screen_resolution != resolution {
-			self.params.screen_resolution = resolution;
-			self.params_buffer.write()?.copy_from_slice(&[self.params]);
+	/// Updates the `Viewport` with the given `resolution` and `projection`.
+	pub fn update(
+		&mut self,
+		resolution: [u32; 2],
+		projection: &glam::Mat4,
+		pixel_scale: f32,
+	) -> anyhow::Result<()> {
+		if self.params.screen_resolution == resolution
+			&& self.params.projection.0 == *projection.as_ref()
+			&& self.params.pixel_scale == pixel_scale
+		{
+			return Ok(());
 		}
+
+		self.params.screen_resolution = resolution;
+		self.params.projection = WMat4::from_glam(projection);
+		self.params.pixel_scale = pixel_scale;
+		self.params_buffer.write()?.copy_from_slice(&[self.params]);
 		Ok(())
 	}
 
@@ -81,4 +96,8 @@ impl Viewport {
 #[derive(BufferContents, Clone, Copy, Debug, PartialEq)]
 pub(crate) struct Params {
 	pub screen_resolution: [u32; 2],
+	pub pixel_scale: f32,
+	pub padding1: [f32; 1], // always zero
+
+	pub projection: WMat4,
 }

@@ -3,8 +3,8 @@
 
 precision highp float;
 
-layout(location = 0) in ivec2 in_pos;
-layout(location = 1) in uint in_dim;
+layout(location = 0) in uint in_model_idx;
+layout(location = 1) in uint in_rect_dim;
 layout(location = 2) in uint in_uv;
 layout(location = 3) in uint in_color;
 layout(location = 4) in uint content_type_with_srgb;
@@ -18,6 +18,9 @@ layout(set = 0, binding = 0) uniform sampler2D color_atlas;
 layout(set = 1, binding = 0) uniform sampler2D mask_atlas;
 
 #define UNIFORM_PARAMS_SET 2
+#define MODEL_BUFFER_SET 3
+
+#include "model_buffer.glsl"
 #include "uniform.glsl"
 
 float srgb_to_linear(float c) {
@@ -29,22 +32,23 @@ float srgb_to_linear(float c) {
 }
 
 void main() {
-  ivec2 pos = in_pos;
-  uint width = in_dim & 0xffffu;
-  uint height = (in_dim & 0xffff0000u) >> 16u;
+  uint v = uint(gl_VertexIndex); // 0-3
+  uint rect_width = in_rect_dim & 0xffffu;
+  uint rect_height = (in_rect_dim & 0xffff0000u) >> 16u;
+  vec2 rect_size = vec2(float(rect_width), float(rect_height));
+  float rect_aspect = rect_size.x / rect_size.y;
 
   uvec2 uv = uvec2(in_uv & 0xffffu, (in_uv & 0xffff0000u) >> 16u);
-  uint v = uint(gl_VertexIndex);
 
-  uvec2 corner_position = uvec2(v & 1u, (v >> 1u) & 1u);
-
-  uvec2 corner_offset = uvec2(width, height) * corner_position;
-
+  uvec2 corner_pos_u = uvec2(v & 1u, (v >> 1u) & 1u);
+  vec2 corner_pos = vec2(corner_pos_u);
+  uvec2 corner_offset = uvec2(rect_width, rect_height) * corner_pos_u;
   uv = uv + corner_offset;
-  pos = pos + ivec2(corner_offset);
 
-  gl_Position = vec4(2.0 * vec2(pos) / vec2(uniforms.screen_resolution) - 1.0,
-                     depth, 1.0);
+  mat4 model_matrix = model_buffer.models[in_model_idx];
+
+  gl_Position =
+      uniforms.projection * model_matrix * vec4(corner_pos, depth, 1.0);
 
   content_type = content_type_with_srgb & 0xffffu;
   uint srgb = (content_type_with_srgb & 0xffff0000u) >> 16u;
