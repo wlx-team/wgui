@@ -1,4 +1,4 @@
-use std::sync::Arc;
+use std::{cell::RefCell, rc::Rc, sync::Arc};
 
 use cosmic_text::Buffer;
 
@@ -76,6 +76,7 @@ pub struct Context {
 	text_pipeline: TextPipeline,
 	scale: f32,
 	pub dirty: bool,
+	empty_text: Rc<RefCell<Buffer>>,
 }
 
 impl Context {
@@ -96,6 +97,7 @@ impl Context {
 			text_pipeline,
 			scale,
 			dirty: true,
+			empty_text: Rc::new(RefCell::new(Buffer::new_empty(DEFAULT_METRICS))),
 		})
 	}
 
@@ -144,8 +146,6 @@ impl Context {
 		let mut passes = Vec::<RendererPass>::new();
 		self.new_pass(&mut passes)?;
 
-		let empty_buffer = Buffer::new_empty(DEFAULT_METRICS);
-
 		for primitive in primitives.iter() {
 			let pass = passes.last_mut().unwrap(); // always safe
 
@@ -161,7 +161,7 @@ impl Context {
 				}
 				drawing::RenderPrimitive::Text(boundary, text) => {
 					pass.text_areas.push(TextArea {
-						buffer: text,
+						buffer: text.clone(),
 						left: boundary.x * self.scale,
 						top: boundary.y * self.scale,
 						bounds: TextBounds::default(), //FIXME: just using boundary coords here doesn't work
@@ -173,7 +173,7 @@ impl Context {
 				}
 				drawing::RenderPrimitive::Sprite(boundary, sprites) => {
 					pass.text_areas.push(TextArea {
-						buffer: &empty_buffer,
+						buffer: self.empty_text.clone(),
 						left: boundary.x * self.scale,
 						top: boundary.y * self.scale,
 						bounds: TextBounds::default(),

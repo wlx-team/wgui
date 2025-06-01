@@ -1,3 +1,5 @@
+use std::{cell::RefCell, rc::Rc};
+
 use cosmic_text::{Attrs, Buffer, Color, Shaping, Weight};
 
 use crate::{
@@ -58,9 +60,10 @@ impl WidgetObj for SpriteBox {
 				// set text last in order to avoid expensive re-shaping
 				buffer.set_text("Error", &attrs, Shaping::Basic);
 			}
-			state
-				.primitives
-				.push(drawing::RenderPrimitive::Text(boundary, buffer));
+			state.primitives.push(drawing::RenderPrimitive::Text(
+				boundary,
+				Rc::new(RefCell::new(buffer)),
+			));
 		};
 	}
 
@@ -69,7 +72,6 @@ impl WidgetObj for SpriteBox {
 		_known_dimensions: taffy::Size<Option<f32>>,
 		_available_space: taffy::Size<taffy::AvailableSpace>,
 	) -> taffy::Size<f32> {
-		//TODO: do we even need this?
 		taffy::Size::ZERO
 	}
 }

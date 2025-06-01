@@ -3,17 +3,19 @@ mod shaders;
 pub mod text_atlas;
 pub mod text_renderer;
 
-use std::sync::{LazyLock, Mutex};
+use std::{
+	cell::RefCell,
+	rc::Rc,
+	sync::{LazyLock, Mutex},
+};
 
 use cosmic_text::{
-	Align, Attrs, Buffer, Color, FontSystem, Metrics, Shaping, Style, SwashCache, Weight, Wrap,
+	Align, Attrs, Buffer, Color, FontSystem, Metrics, Style, SwashCache, Weight, Wrap,
 };
 use custom_glyph::{ContentType, CustomGlyph};
 use etagere::AllocId;
-use glam::ivec2;
-use taffy::AvailableSpace;
 
-use crate::drawing::{self, Boundary};
+use crate::drawing::{self};
 
 pub static FONT_SYSTEM: LazyLock<Mutex<FontSystem>> =
 	LazyLock::new(|| Mutex::new(FontSystem::new()));
@@ -30,92 +32,6 @@ pub(crate) const DEFAULT_METRICS: Metrics = Metrics::new(
 	DEFAULT_FONT_SIZE,
 	DEFAULT_FONT_SIZE * DEFAULT_LINE_HEIGHT_RATIO,
 );
-
-pub struct RenderableText {
-	buffer: Buffer,
-}
-
-impl RenderableText {
-	/// Used to render text where the style is the same for the entire length.
-	pub fn new(content: &str, style: &TextStyle) -> Self {
-		let metrics = style.into();
-		let attrs = style.into();
-		let wrap = style.into();
-
-		let mut buffer = Buffer::new_empty(metrics);
-
-		{
-			let mut font_system = FONT_SYSTEM.lock().unwrap(); // safe unwrap
-			let mut buffer = buffer.borrow_with(&mut font_system);
-			buffer.set_wrap(wrap);
-
-			// set text last in order to avoid expensive re-shaping
-			buffer.set_rich_text(
-				[(content, attrs)],
-				&Attrs::new(),
-				Shaping::Advanced,
-				style.align.map(|a| a.into()),
-			);
-		}
-
-		Self { buffer }
-	}
-
-	pub fn get_buffer(&self) -> &Buffer {
-		&self.buffer
-	}
-
-	pub fn measure(
-		&mut self,
-		known_dimensions: taffy::Size<Option<f32>>,
-		available_space: taffy::Size<taffy::AvailableSpace>,
-	) -> taffy::Size<f32> {
-		// Set width constraint
-		let width_constraint = known_dimensions.width.or(match available_space.width {
-			AvailableSpace::MinContent => Some(0.0),
-			AvailableSpace::MaxContent => None,
-			AvailableSpace::Definite(width) => Some(width),
-		});
-
-		let mut font_system = FONT_SYSTEM.lock().unwrap(); // safe unwrap
-		self
-			.buffer
-			.set_size(&mut font_system, width_constraint, None);
-
-		// Compute layout
-		self.buffer.shape_until_scroll(&mut font_system, false);
-
-		// Determine measured size of text
-		let (width, total_lines) = self
-			.buffer
-			.layout_runs()
-			.fold((0.0, 0usize), |(width, total_lines), run| {
-				(run.line_w.max(width), total_lines + 1)
-			});
-		let height = total_lines as f32 * self.buffer.metrics().line_height;
-
-		taffy::Size { width, height }
-	}
-
-	pub fn draw<F>(&self, boundary: Boundary, mut f: F)
-	where
-		F: FnMut(i32, i32, u32, u32, drawing::Color),
-	{
-		const DEFAULT_COLOR: cosmic_text::Color = Color::rgb(0, 0, 0);
-
-		let mut swash_cache = SWASH_CACHE.lock().unwrap(); // safe unwrap
-		let mut font_system = FONT_SYSTEM.lock().unwrap(); // safe unwrap
-
-		let pos = ivec2(boundary.x as _, boundary.y as _);
-
-		self.buffer.draw(
-			&mut font_system,
-			&mut swash_cache,
-			DEFAULT_COLOR, // color is set in via `attrs` in new()
-			|x, y, w, h, color| f(x + pos.x, y + pos.y, w, h, color.into()),
-		);
-	}
-}
 
 #[derive(Default, Clone)]
 pub struct TextStyle {
@@ -287,7 +203,7 @@ impl Default for TextBounds {
 #[derive(Clone)]
 pub struct TextArea<'a> {
 	/// The buffer containing the text to be rendered.
-	pub buffer: &'a Buffer,
+	pub buffer: Rc<RefCell<Buffer>>,
 	/// The left edge of the buffer.
 	pub left: f32,
 	/// The top edge of the buffer.
