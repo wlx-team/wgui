@@ -1,6 +1,9 @@
 use std::{
 	f32,
-	sync::{LazyLock, Mutex},
+	sync::{
+		Arc,
+		atomic::{AtomicUsize, Ordering},
+	},
 };
 
 use cosmic_text::SubpixelBin;
@@ -9,30 +12,43 @@ use image::{
 	imageops::{FilterType, resize},
 };
 use resvg::usvg::{Options, Tree};
-use slotmap::{SlotMap, new_key_type};
 
-new_key_type! { pub struct CustomGlyphId; }
+static AUTO_INCREMENT: AtomicUsize = AtomicUsize::new(0);
 
-static CUSTOM_GLYPH_SOURCES: LazyLock<Mutex<SlotMap<CustomGlyphId, CustomGlyphType>>> =
-	LazyLock::new(|| Mutex::new(SlotMap::with_key()));
-
-pub enum CustomGlyphType {
+#[derive(Debug, Clone)]
+pub enum CustomGlyphContent {
 	Svg(Tree),
 	SvgFile(String),
 	Image(RgbaImage),
 	ImageFile(String),
 }
 
-pub fn register_custom_glyph(glyph: CustomGlyphType) -> CustomGlyphId {
-	let mut sources = CUSTOM_GLYPH_SOURCES.lock().unwrap(); // want panic
-	sources.insert(glyph)
+#[derive(Debug, Clone)]
+pub struct CustomGlyphData {
+	pub(super) id: usize,
+	pub(super) content: Arc<CustomGlyphContent>,
+}
+
+impl CustomGlyphData {
+	pub fn new(content: CustomGlyphContent) -> Self {
+		Self {
+			id: AUTO_INCREMENT.fetch_add(1, Ordering::Relaxed),
+			content: Arc::new(content),
+		}
+	}
+}
+
+impl PartialEq for CustomGlyphData {
+	fn eq(&self, other: &Self) -> bool {
+		self.id.eq(&other.id)
+	}
 }
 
 /// A custom glyph to render
-#[derive(Default, Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct CustomGlyph {
 	/// The unique identifier for this glyph
-	pub id: CustomGlyphId,
+	pub data: CustomGlyphData,
 	/// The position of the left edge of the glyph
 	pub left: f32,
 	/// The position of the top edge of the glyph
@@ -50,15 +66,27 @@ pub struct CustomGlyph {
 	/// pixel and the resulting `SubpixelBin`'s in `RasterizationRequest` will always
 	/// be `Zero` (useful for images and other large glyphs).
 	pub snap_to_physical_pixel: bool,
-	/// Additional metadata about the glyph
-	pub metadata: usize,
+}
+
+impl CustomGlyph {
+	pub fn new(data: CustomGlyphData) -> Self {
+		Self {
+			data,
+			left: 0.0,
+			top: 0.0,
+			width: 0.0,
+			height: 0.0,
+			color: None,
+			snap_to_physical_pixel: true,
+		}
+	}
 }
 
 /// A request to rasterize a custom glyph
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct RasterizeCustomGlyphRequest {
 	/// The unique identifier of the glyph
-	pub id: CustomGlyphId,
+	pub data: CustomGlyphData,
 	/// The width of the glyph in physical pixels
 	pub width: u16,
 	/// The height of the glyph in physical pixels
@@ -88,20 +116,18 @@ pub struct RasterizedCustomGlyph {
 }
 
 impl RasterizedCustomGlyph {
-	pub(super) fn try_from(input: RasterizeCustomGlyphRequest) -> Option<RasterizedCustomGlyph> {
-		let sources = CUSTOM_GLYPH_SOURCES.lock().unwrap(); // want panic
-
-		match sources.get(input.id)? {
-			CustomGlyphType::Svg(tree) => rasterize_svg(tree, &input),
-			CustomGlyphType::Image(data) => rasterize_image(data, &input),
-			CustomGlyphType::SvgFile(path) => {
+	pub(super) fn try_from(input: &RasterizeCustomGlyphRequest) -> Option<RasterizedCustomGlyph> {
+		match input.data.content.as_ref() {
+			CustomGlyphContent::Svg(tree) => rasterize_svg(tree, input),
+			CustomGlyphContent::Image(data) => rasterize_image(data, input),
+			CustomGlyphContent::SvgFile(path) => {
 				let data = std::fs::read(path).ok()?;
 				let tree = Tree::from_data(&data, &Options::default()).ok()?;
-				rasterize_svg(&tree, &input)
+				rasterize_svg(&tree, input)
 			}
-			CustomGlyphType::ImageFile(path) => {
+			CustomGlyphContent::ImageFile(path) => {
 				let image = ImageReader::open(path).ok()?.decode().ok()?.into_rgba8();
-				rasterize_image(&image, &input)
+				rasterize_image(&image, input)
 			}
 		}
 	}
@@ -133,7 +159,7 @@ impl RasterizedCustomGlyph {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct CustomGlyphCacheKey {
 	/// Font ID
-	pub glyph_id: CustomGlyphId,
+	pub glyph_id: usize,
 	/// Glyph width
 	pub width: u16,
 	/// Glyph height

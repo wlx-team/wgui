@@ -10,7 +10,7 @@ use crate::{
 	layout::{Layout, WidgetID},
 	renderer_vk::text::{
 		FontWeight, HorizontalAlign,
-		custom_glyph::{CustomGlyphType, register_custom_glyph},
+		custom_glyph::{CustomGlyphContent, CustomGlyphData},
 	},
 	widget::{
 		div::Div,
@@ -473,21 +473,23 @@ fn parse_widget_sprite<'a>(
 		#[allow(clippy::single_match)]
 		match key {
 			"src" => {
-				if value.ends_with(".svg") || value.ends_with(".svgz") {
-					glyph = Some(CustomGlyphType::SvgFile(value.into()));
-				} else {
-					glyph = Some(CustomGlyphType::ImageFile(value.into()));
+				if std::fs::exists(value).unwrap_or(false) {
+					if value.ends_with(".svg") || value.ends_with(".svgz") {
+						glyph = Some(CustomGlyphContent::SvgFile(value.into()));
+					} else {
+						glyph = Some(CustomGlyphContent::ImageFile(value.into()));
+					}
 				}
 			}
 			_ => {}
 		}
 	}
 
-	let Some(glyph) = glyph else {
-		anyhow::bail!("No source for sprite node!");
+	if let Some(glyph) = glyph {
+		params.glyph_data = Some(CustomGlyphData::new(glyph));
+	} else {
+		log::warn!("No source for sprite node!");
 	};
-
-	params.glyph_id = register_custom_glyph(glyph);
 
 	let (new_id, _) =
 		ctx

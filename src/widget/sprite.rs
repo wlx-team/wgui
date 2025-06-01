@@ -1,13 +1,18 @@
+use cosmic_text::{Attrs, Buffer, Color, Shaping, Weight};
+
 use crate::{
 	drawing::{self},
-	renderer_vk::text::custom_glyph::{CustomGlyph, CustomGlyphId},
+	renderer_vk::text::{
+		DEFAULT_METRICS, FONT_SYSTEM,
+		custom_glyph::{CustomGlyph, CustomGlyphData},
+	},
 };
 
 use super::{WidgetObj, WidgetState};
 
 #[derive(Default)]
 pub struct SpriteBoxParams {
-	pub glyph_id: CustomGlyphId,
+	pub glyph_data: Option<CustomGlyphData>,
 }
 
 #[derive(Default)]
@@ -25,20 +30,38 @@ impl WidgetObj for SpriteBox {
 	fn draw(&mut self, state: &mut super::DrawState, _params: &super::DrawParams) {
 		let boundary = drawing::Boundary::construct(state.transform_stack);
 
-		let glyph = CustomGlyph {
-			id: self.params.glyph_id,
-			left: 0.0,
-			top: 0.0,
-			width: boundary.w,
-			height: boundary.h,
-			color: Some(cosmic_text::Color::rgb(255, 255, 255)),
-			snap_to_physical_pixel: true,
-			metadata: 0,
-		};
+		if let Some(glyph_data) = self.params.glyph_data.as_ref() {
+			let glyph = CustomGlyph {
+				data: glyph_data.clone(),
+				left: 0.0,
+				top: 0.0,
+				width: boundary.w,
+				height: boundary.h,
+				color: Some(cosmic_text::Color::rgb(255, 255, 255)),
+				snap_to_physical_pixel: true,
+			};
 
-		state
-			.primitives
-			.push(drawing::RenderPrimitive::Sprite(boundary, Some(glyph)));
+			state
+				.primitives
+				.push(drawing::RenderPrimitive::Sprite(boundary, Some(glyph)));
+		} else {
+			// Source not set or not available, display error text
+			let mut buffer = Buffer::new_empty(DEFAULT_METRICS);
+
+			{
+				let mut font_system = FONT_SYSTEM.lock().unwrap(); // safe unwrap
+				let mut buffer = buffer.borrow_with(&mut font_system);
+				let attrs = Attrs::new()
+					.color(Color::rgb(255, 0, 255))
+					.weight(Weight::BOLD);
+
+				// set text last in order to avoid expensive re-shaping
+				buffer.set_text("Error", &attrs, Shaping::Basic);
+			}
+			state
+				.primitives
+				.push(drawing::RenderPrimitive::Text(boundary, buffer));
+		};
 	}
 
 	fn measure(

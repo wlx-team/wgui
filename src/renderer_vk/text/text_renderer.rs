@@ -77,7 +77,7 @@ impl TextRenderer {
 				};
 
 				let cache_key = GlyphonCacheKey::Custom(CustomGlyphCacheKey {
-					glyph_id: glyph.id,
+					glyph_id: glyph.data.id,
 					width,
 					height,
 					x_bin,
@@ -107,7 +107,7 @@ impl TextRenderer {
 						}
 
 						let input = RasterizeCustomGlyphRequest {
-							id: glyph.id,
+							data: glyph.data.clone(),
 							width,
 							height,
 							x_bin,
@@ -115,7 +115,7 @@ impl TextRenderer {
 							scale: text_area.scale,
 						};
 
-						let output = RasterizedCustomGlyph::try_from(input)?;
+						let output = RasterizedCustomGlyph::try_from(&input)?;
 
 						output.validate(&input, None);
 
