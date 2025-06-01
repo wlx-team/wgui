@@ -64,6 +64,8 @@ pub struct GlyphVertex {
 	pub content_type_with_srgb: [u16; 2],
 	#[format(R32_SFLOAT)]
 	pub depth: f32,
+	#[format(R32_SFLOAT)]
+	pub scale: f32,
 }
 
 type Hasher = BuildHasherDefault<FxHasher>;

@@ -9,6 +9,7 @@ layout(location = 2) in uint in_uv;
 layout(location = 3) in uint in_color;
 layout(location = 4) in uint content_type_with_srgb;
 layout(location = 5) in float depth;
+layout(location = 7) in float scale;
 
 layout(location = 0) out vec4 out_color;
 layout(location = 1) out vec2 out_uv;
@@ -48,7 +49,7 @@ void main() {
   mat4 model_matrix = model_buffer.models[in_model_idx];
 
   gl_Position =
-      uniforms.projection * model_matrix * vec4(corner_pos, depth, 1.0);
+      uniforms.projection * model_matrix * vec4(corner_pos * scale, depth, 1.0);
 
   content_type = content_type_with_srgb & 0xffffu;
   uint srgb = (content_type_with_srgb & 0xffff0000u) >> 16u;

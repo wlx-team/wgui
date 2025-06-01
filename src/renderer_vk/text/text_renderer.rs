@@ -106,6 +106,7 @@ impl TextRenderer {
 						font_system,
 						model_buffer: &mut self.model_buffer,
 						scale_factor: text_area.scale,
+						glyph_scale: width as f32 / cached_width as f32,
 						bounds_min_x,
 						bounds_min_y,
 						bounds_max_x,
@@ -179,6 +180,7 @@ impl TextRenderer {
 							cache,
 							font_system,
 							model_buffer: &mut self.model_buffer,
+							glyph_scale: 1.0,
 							scale_factor: text_area.scale,
 							bounds_min_x,
 							bounds_min_y,
@@ -303,6 +305,7 @@ struct PrepareGlyphParams<'a> {
 	model_buffer: &'a mut ModelBuffer,
 	transform: &'a Mat4,
 	scale_factor: f32,
+	glyph_scale: f32,
 	bounds_min_x: i32,
 	bounds_min_y: i32,
 	bounds_max_x: i32,
@@ -466,5 +469,6 @@ fn prepare_glyph(
 			} as u16,
 		],
 		depth: par.depth,
+		scale: par.glyph_scale,
 	}))
 }
