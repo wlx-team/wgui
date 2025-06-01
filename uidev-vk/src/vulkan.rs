@@ -1,20 +1,12 @@
 use std::sync::{Arc, OnceLock};
 use wgui::gfx::WGfx;
 use wgui::vulkano::{
-	self, DeviceSize,
-	command_buffer::allocator::{
-		StandardCommandBufferAllocator, StandardCommandBufferAllocatorCreateInfo,
-	},
-	descriptor_set::allocator::StandardDescriptorSetAllocator,
+	self,
 	device::{
 		Device, DeviceCreateInfo, DeviceExtensions, DeviceFeatures, Queue, QueueCreateInfo, QueueFlags,
 		physical::{PhysicalDevice, PhysicalDeviceType},
 	},
 	instance::{Instance, InstanceCreateInfo},
-	memory::{
-		MemoryPropertyFlags,
-		allocator::{GenericMemoryAllocatorCreateInfo, StandardMemoryAllocator},
-	},
 };
 
 static VULKAN_LIBRARY: OnceLock<Arc<vulkano::VulkanLibrary>> = OnceLock::new();
@@ -28,10 +20,7 @@ pub fn init_window() -> anyhow::Result<(
 	Arc<winit::window::Window>,
 	Arc<vulkano::swapchain::Surface>,
 )> {
-	use vulkano::{
-		descriptor_set::allocator::StandardDescriptorSetAllocatorCreateInfo,
-		instance::InstanceCreateFlags, swapchain::Surface,
-	};
+	use vulkano::{instance::InstanceCreateFlags, swapchain::Surface};
 	use winit::{event_loop::EventLoop, window::Window};
 
 	let event_loop = EventLoop::new().unwrap(); // want panic
@@ -61,7 +50,7 @@ pub fn init_window() -> anyhow::Result<(
 
 	log::debug!("Device exts for app: {:?}", &device_extensions);
 
-	let (physical_device, my_extensions, queue_families) = instance
+	let (physical_device, mut my_extensions, queue_families) = instance
 		.enumerate_physical_devices()?
 		.filter_map(|p| {
 			if p.supported_extensions().contains(&device_extensions) {
@@ -90,6 +79,11 @@ pub fn init_window() -> anyhow::Result<(
 		physical_device.properties().device_name,
 	);
 
+	if physical_device.supported_extensions().img_filter_cubic {
+		my_extensions.img_filter_cubic = true;
+		log::info!("img_filter_cubic!");
+	}
+
 	let (device, queues) = Device::new(
 		physical_device,
 		DeviceCreateInfo {
@@ -112,69 +106,8 @@ pub fn init_window() -> anyhow::Result<(
 
 	let (queue_gfx, queue_xfer, _) = unwrap_queues(queues.collect());
 
-	let memory_allocator = memory_allocator(device.clone());
-	let command_buffer_allocator = Arc::new(StandardCommandBufferAllocator::new(
-		device.clone(),
-		StandardCommandBufferAllocatorCreateInfo {
-			secondary_buffer_count: 32,
-			..Default::default()
-		},
-	));
-	let descriptor_set_allocator = Arc::new(StandardDescriptorSetAllocator::new(
-		device.clone(),
-		StandardDescriptorSetAllocatorCreateInfo::default(),
-	));
-
-	let me = WGfx {
-		instance,
-		device,
-		queue_gfx,
-		queue_xfer,
-		memory_allocator,
-		command_buffer_allocator,
-		descriptor_set_allocator,
-	};
-
-	Ok((Arc::new(me), event_loop, window, surface))
-}
-
-fn memory_allocator(device: Arc<Device>) -> Arc<StandardMemoryAllocator> {
-	let props = device.physical_device().memory_properties();
-
-	let mut block_sizes = vec![0; props.memory_types.len()];
-	let mut memory_type_bits = u32::MAX;
-
-	for (index, memory_type) in props.memory_types.iter().enumerate() {
-		const LARGE_HEAP_THRESHOLD: DeviceSize = 1024 * 1024 * 1024;
-
-		let heap_size = props.memory_heaps[memory_type.heap_index as usize].size;
-
-		block_sizes[index] = if heap_size >= LARGE_HEAP_THRESHOLD {
-			48 * 1024 * 1024
-		} else {
-			24 * 1024 * 1024
-		};
-
-		if memory_type.property_flags.intersects(
-			MemoryPropertyFlags::LAZILY_ALLOCATED
-				| MemoryPropertyFlags::PROTECTED
-				| MemoryPropertyFlags::DEVICE_COHERENT
-				| MemoryPropertyFlags::RDMA_CAPABLE,
-		) {
-			// VUID-VkMemoryAllocateInfo-memoryTypeIndex-01872
-			// VUID-vkAllocateMemory-deviceCoherentMemory-02790
-			// Lazily allocated memory would just cause problems for suballocation in general.
-			memory_type_bits &= !(1 << index);
-		}
-	}
-
-	let create_info = GenericMemoryAllocatorCreateInfo {
-		block_sizes: &block_sizes,
-		memory_type_bits,
-		..Default::default()
-	};
-
-	Arc::new(StandardMemoryAllocator::new(device, create_info))
+	let me = WGfx::new_from_raw(instance, device, queue_gfx, queue_xfer);
+	Ok((me, event_loop, window, surface))
 }
 
 #[derive(Debug)]

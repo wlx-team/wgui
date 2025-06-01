@@ -18,7 +18,7 @@ use vulkano::{
 	},
 	device::{Device, Queue},
 	format::Format,
-	image::{Image, ImageCreateInfo, ImageType, ImageUsage},
+	image::{Image, ImageCreateInfo, ImageType, ImageUsage, sampler::Filter},
 	instance::Instance,
 	memory::{
 		MemoryPropertyFlags,
@@ -63,6 +63,8 @@ pub struct WGfx {
 	pub queue_gfx: Arc<Queue>,
 	pub queue_xfer: Arc<Queue>,
 
+	pub texture_filter: Filter,
+
 	pub memory_allocator: Arc<StandardMemoryAllocator>,
 	pub command_buffer_allocator: Arc<StandardCommandBufferAllocator>,
 	pub descriptor_set_allocator: Arc<StandardDescriptorSetAllocator>,
@@ -88,11 +90,18 @@ impl WGfx {
 			StandardDescriptorSetAllocatorCreateInfo::default(),
 		));
 
+		let quality_filter = if device.enabled_extensions().img_filter_cubic {
+			Filter::Cubic
+		} else {
+			Filter::Linear
+		};
+
 		Arc::new(Self {
 			instance,
 			device,
 			queue_gfx,
 			queue_xfer,
+			texture_filter: quality_filter,
 			memory_allocator,
 			command_buffer_allocator,
 			descriptor_set_allocator,
