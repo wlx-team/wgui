@@ -474,11 +474,7 @@ fn parse_widget_sprite<'a>(
 		match key {
 			"src" => {
 				if std::fs::exists(value).unwrap_or(false) {
-					if value.ends_with(".svg") || value.ends_with(".svgz") {
-						glyph = Some(CustomGlyphContent::SvgFile(value.into()));
-					} else {
-						glyph = Some(CustomGlyphContent::ImageFile(value.into()));
-					}
+					glyph = CustomGlyphContent::from_file(value).ok();
 				}
 			}
 			_ => {}

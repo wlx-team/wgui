@@ -20,11 +20,18 @@
         <!-- filled-in at runtime -->
       </rectangle>
       <!-- File not found, will show "Error" in purple -->
+      <rectangle width="400" height="260" round="0.5" padding="2" align_items="center" border_color="#ffffff">
+      <sprite width="32" height="32" src="/usr/share/icons/nvtop.svg" />
+      <sprite width="64" height="64" src="/usr/share/icons/nvtop.svg" />
+      <sprite width="128" height="128" src="/usr/share/icons/nvtop.svg" />
+      <sprite width="256" height="256" src="/usr/share/icons/nvtop.svg" />
+      </rectangle>
       <sprite width="32" height="32" src="/this/file/does/not/exist.png" />
+      <sprite width="32" height="32" src="/usr/share/icons/hicolor/128x128/apps/blueman.png" />
       <sprite width="32" height="32" src="/usr/share/icons/hicolor/32x32/apps/blueman.png" />
       <sprite width="64" height="64" src="/usr/share/icons/hicolor/64x64/apps/blueman.png" />
       <sprite width="128" height="128" src="/usr/share/icons/hicolor/128x128/apps/blueman.png" />
-      <sprite width="256" height="256" src="/usr/share/icons/nvtop.svg" />
+      <sprite width="160" height="160" src="/usr/share/icons/hicolor/128x128/apps/blueman.png" />
     </div>
     <!-- 2/3 green rects -->
     <div width="100%" height="100%" flex_direction="column">

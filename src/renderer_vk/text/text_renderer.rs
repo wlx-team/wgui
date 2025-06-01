@@ -82,10 +82,12 @@ impl TextRenderer {
 					(x, y, x_bin, y_bin)
 				};
 
+				let (cached_width, cached_height) = glyph.data.dim_for_cache_key(width, height);
+
 				let cache_key = GlyphonCacheKey::Custom(CustomGlyphCacheKey {
 					glyph_id: glyph.data.id,
-					width,
-					height,
+					width: cached_width,
+					height: cached_height,
 					x_bin,
 					y_bin,
 				});
@@ -112,14 +114,14 @@ impl TextRenderer {
 						transform: &text_area.transform,
 					},
 					|_cache, _font_system| -> Option<GetGlyphImageResult> {
-						if width == 0 || height == 0 {
+						if cached_width == 0 || cached_height == 0 {
 							return None;
 						}
 
 						let input = RasterizeCustomGlyphRequest {
 							data: glyph.data.clone(),
-							width,
-							height,
+							width: cached_width,
+							height: cached_height,
 							x_bin,
 							y_bin,
 							scale: text_area.scale,
@@ -133,8 +135,8 @@ impl TextRenderer {
 							content_type: output.content_type,
 							top: 0,
 							left: 0,
-							width,
-							height,
+							width: output.width,
+							height: output.height,
 							data: output.data,
 						})
 					},

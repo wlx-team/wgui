@@ -191,7 +191,7 @@ impl InnerAtlas {
 		// factor of `Vec`.`
 		const GROWTH_FACTOR: u32 = 2;
 		let new_size = (self.size * GROWTH_FACTOR).min(self.max_texture_dimension_2d);
-		log::info!("Grow {:?} atlas {} → {new_size}", self.kind, self.size);
+		log::warn!("Grow {:?} atlas {} → {new_size}", self.kind, self.size);
 
 		self.packer.grow(size2(new_size as i32, new_size as i32));
 

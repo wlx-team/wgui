@@ -7,10 +7,7 @@ use std::{
 };
 
 use cosmic_text::SubpixelBin;
-use image::{
-	ImageReader, RgbaImage,
-	imageops::{FilterType, resize},
-};
+use image::{ImageReader, RgbaImage};
 use resvg::usvg::{Options, Tree};
 
 static AUTO_INCREMENT: AtomicUsize = AtomicUsize::new(0);
@@ -18,9 +15,20 @@ static AUTO_INCREMENT: AtomicUsize = AtomicUsize::new(0);
 #[derive(Debug, Clone)]
 pub enum CustomGlyphContent {
 	Svg(Tree),
-	SvgFile(String),
 	Image(RgbaImage),
-	ImageFile(String),
+}
+
+impl CustomGlyphContent {
+	pub fn from_file(path: &str) -> anyhow::Result<Self> {
+		if path.ends_with(".svg") || path.ends_with(".svgz") {
+			let data = std::fs::read(path)?;
+			let tree = Tree::from_data(&data, &Options::default())?;
+			Ok(CustomGlyphContent::Svg(tree))
+		} else {
+			let image = ImageReader::open(path)?.decode()?.into_rgba8();
+			Ok(CustomGlyphContent::Image(image))
+		}
+	}
 }
 
 #[derive(Debug, Clone)]
@@ -34,6 +42,17 @@ impl CustomGlyphData {
 		Self {
 			id: AUTO_INCREMENT.fetch_add(1, Ordering::Relaxed),
 			content: Arc::new(content),
+		}
+	}
+
+	pub fn dim_for_cache_key(&self, width: u16, height: u16) -> (u16, u16) {
+		const MAX_RASTER_DIM: u16 = 256;
+		match self.content.as_ref() {
+			CustomGlyphContent::Svg(..) => (
+				width.next_power_of_two().min(MAX_RASTER_DIM),
+				height.next_power_of_two().min(MAX_RASTER_DIM),
+			),
+			CustomGlyphContent::Image(image) => (image.width() as _, image.height() as _),
 		}
 	}
 }
@@ -113,22 +132,15 @@ pub struct RasterizedCustomGlyph {
 	pub data: Vec<u8>,
 	/// The type of image data contained in `data`
 	pub content_type: ContentType,
+	pub width: u16,
+	pub height: u16,
 }
 
 impl RasterizedCustomGlyph {
 	pub(super) fn try_from(input: &RasterizeCustomGlyphRequest) -> Option<RasterizedCustomGlyph> {
 		match input.data.content.as_ref() {
 			CustomGlyphContent::Svg(tree) => rasterize_svg(tree, input),
-			CustomGlyphContent::Image(data) => rasterize_image(data, input),
-			CustomGlyphContent::SvgFile(path) => {
-				let data = std::fs::read(path).ok()?;
-				let tree = Tree::from_data(&data, &Options::default()).ok()?;
-				rasterize_svg(&tree, input)
-			}
-			CustomGlyphContent::ImageFile(path) => {
-				let image = ImageReader::open(path).ok()?.decode().ok()?.into_rgba8();
-				rasterize_image(&image, input)
-			}
+			CustomGlyphContent::Image(data) => rasterize_image(data),
 		}
 	}
 
@@ -147,9 +159,9 @@ impl RasterizedCustomGlyph {
 
 		assert_eq!(
 			self.data.len(),
-			input.width as usize * input.height as usize * self.content_type.bytes_per_pixel(),
+			self.width as usize * self.height as usize * self.content_type.bytes_per_pixel(),
 			"Invalid custom glyph rasterizer output. Expected data of length {}, got length {}. Input: {:?}",
-			input.width as usize * input.height as usize * self.content_type.bytes_per_pixel(),
+			self.width as usize * self.height as usize * self.content_type.bytes_per_pixel(),
 			self.data.len(),
 			input,
 		);
@@ -213,27 +225,16 @@ fn rasterize_svg(
 	Some(RasterizedCustomGlyph {
 		data: pixmap.data().to_vec(),
 		content_type: ContentType::Color,
+		width: input.width,
+		height: input.height,
 	})
 }
 
-fn rasterize_image(
-	image: &RgbaImage,
-	input: &RasterizeCustomGlyphRequest,
-) -> Option<RasterizedCustomGlyph> {
-	let data = if image.width() == input.width as _ && image.height() == image.height() as _ {
-		image.to_vec()
-	} else {
-		let resized_image = resize(
-			image,
-			input.width as u32,
-			input.height as u32,
-			FilterType::Triangle,
-		);
-		resized_image.to_vec()
-	};
-
+fn rasterize_image(image: &RgbaImage) -> Option<RasterizedCustomGlyph> {
 	Some(RasterizedCustomGlyph {
-		data,
+		data: image.to_vec(),
 		content_type: ContentType::Color,
+		width: image.width() as _,
+		height: image.height() as _,
 	})
 }
