@@ -63,19 +63,19 @@
     </div>
     <!-- 3/3 yellow rect -->
     <rectangle color="#ffff99" width="100%" height="100%" flex_direction="column" padding="16">
-      <div height="100%">
+      <div height="100%" flex_direction="column">
         <label text="Multi line test #1&#xA;This is aligned to the left." align="left" size="20" color="#330000" />
         <rectangle width="100%" height="1" />
       </div>
-      <div height="100%">
+      <div height="100%" flex_direction="column">
         <label text="Multi line test #2&#xA;This is aligned to the right." align="right" size="20" color="#330000" />
         <rectangle width="100%" height="1" />
       </div>
-      <div height="100%">
+      <div height="100%" flex_direction="column">
         <label text="Multi line test #3&#xA;This is aligned to the center.&#xA;The longer lines are still alinged to the center." align="center" size="20" color="#330000" />
         <rectangle width="100%" height="1" />
       </div>
-      <div height="100%">
+      <div height="100%" flex_direction="column">
         <label text="Multi line test #4&#xA;This is justified alignment.&#xA;The longer lines are the same length as the shorter lines." align="justified" size="20" color="#330000" />
         <rectangle width="100%" height="1" />
       </div>
