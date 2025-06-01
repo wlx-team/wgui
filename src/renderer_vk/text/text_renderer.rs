@@ -311,7 +311,7 @@ fn prepare_glyph(
 				match inner.try_allocate(image.width as usize, image.height as usize) {
 					Some(a) => break a,
 					None => {
-						if !atlas.grow(font_system, cache, image.content_type, scale_factor)? {
+						if !atlas.grow(font_system, cache, image.content_type)? {
 							anyhow::bail!(
 								"Atlas full. atlas: {:?} cache_key: {:?}",
 								image.content_type,

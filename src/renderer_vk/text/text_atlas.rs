@@ -4,19 +4,18 @@ use lru::LruCache;
 use rustc_hash::FxHasher;
 use std::{collections::HashSet, hash::BuildHasherDefault, sync::Arc};
 use vulkano::{
-	DeviceSize,
-	buffer::{Buffer, BufferContents, BufferCreateInfo, BufferUsage, Subbuffer},
+	buffer::BufferContents,
 	command_buffer::CommandBufferUsage,
 	descriptor_set::DescriptorSet,
 	format::Format,
 	image::{Image, ImageCreateInfo, ImageType, ImageUsage, sampler::Filter, view::ImageView},
-	memory::allocator::{AllocationCreateInfo, MemoryTypeFilter},
+	memory::allocator::AllocationCreateInfo,
 	pipeline::graphics::{input_assembly::PrimitiveTopology, vertex_input::Vertex},
 };
 
 use super::{
 	GlyphDetails, GpuCacheStatus,
-	custom_glyph::{ContentType, RasterizeCustomGlyphRequest, RasterizedCustomGlyph},
+	custom_glyph::ContentType,
 	shaders::{frag_atlas, vert_atlas},
 	text_renderer::GlyphonCacheKey,
 };
@@ -82,7 +81,7 @@ pub(super) struct InnerAtlas {
 }
 
 impl InnerAtlas {
-	const INITIAL_SIZE: u32 = 1024;
+	const INITIAL_SIZE: u32 = 256;
 
 	fn new(common: TextPipeline, kind: Kind) -> anyhow::Result<Self> {
 		let max_texture_dimension_2d = common
@@ -102,7 +101,7 @@ impl InnerAtlas {
 				image_type: ImageType::Dim2d,
 				format: kind.texture_format(),
 				extent: [size, size, 1],
-				usage: ImageUsage::SAMPLED | ImageUsage::TRANSFER_DST,
+				usage: ImageUsage::SAMPLED | ImageUsage::TRANSFER_SRC | ImageUsage::TRANSFER_DST,
 				..Default::default()
 			},
 			AllocationCreateInfo::default(),
@@ -183,7 +182,6 @@ impl InnerAtlas {
 		&mut self,
 		font_system: &mut FontSystem,
 		cache: &mut SwashCache,
-		scale_factor: f32,
 	) -> anyhow::Result<bool> {
 		if self.size >= self.max_texture_dimension_2d {
 			return Ok(false);
@@ -193,17 +191,17 @@ impl InnerAtlas {
 		// factor of `Vec`.`
 		const GROWTH_FACTOR: u32 = 2;
 		let new_size = (self.size * GROWTH_FACTOR).min(self.max_texture_dimension_2d);
+		log::info!("Grow {:?} atlas {} → {new_size}", self.kind, self.size);
 
 		self.packer.grow(size2(new_size as i32, new_size as i32));
 
-		let _old_image = self.image_view.image().clone();
-		//TODO: copy from old_image
+		let old_image = self.image_view.image().clone();
 
 		let image = self.common.gfx.new_image(
 			new_size,
 			new_size,
-			self.common.inner.format,
-			ImageUsage::SAMPLED | ImageUsage::TRANSFER_DST,
+			old_image.format(),
+			ImageUsage::SAMPLED | ImageUsage::TRANSFER_SRC | ImageUsage::TRANSFER_DST,
 		)?;
 
 		self.image_view = ImageView::new_default(image.clone()).unwrap();
@@ -220,63 +218,22 @@ impl InnerAtlas {
 				GpuCacheStatus::SkipRasterization => continue,
 			};
 
-			let (image_data, width, height) = match cache_key {
+			let (width, height) = match cache_key {
 				GlyphonCacheKey::Text(cache_key) => {
 					let image = cache.get_image_uncached(font_system, cache_key).unwrap();
 					let width = image.placement.width as usize;
 					let height = image.placement.height as usize;
-
-					(image.data, width, height)
+					(width, height)
 				}
-				GlyphonCacheKey::Custom(cache_key) => {
-					let input = RasterizeCustomGlyphRequest {
-						id: cache_key.glyph_id,
-						width: cache_key.width,
-						height: cache_key.height,
-						x_bin: cache_key.x_bin,
-						y_bin: cache_key.y_bin,
-						scale: scale_factor,
-					};
-
-					let Some(rasterized_glyph) = RasterizedCustomGlyph::try_from(input) else {
-						panic!(
-							"Custom glyph rasterizer returned `None` when it previously returned `Some` for the same input {:?}",
-							&input
-						);
-					};
-
-					// Sanity checks on the rasterizer output
-					rasterized_glyph.validate(&input, Some(self.kind.as_content_type()));
-
-					(
-						rasterized_glyph.data,
-						cache_key.width as usize,
-						cache_key.height as usize,
-					)
-				}
+				GlyphonCacheKey::Custom(cache_key) => (cache_key.width as usize, cache_key.height as usize),
 			};
 
-			let buffer: Subbuffer<[u8]> = Buffer::new_slice(
-				self.common.gfx.memory_allocator.clone(),
-				BufferCreateInfo {
-					usage: BufferUsage::TRANSFER_SRC,
-					..Default::default()
-				},
-				AllocationCreateInfo {
-					memory_type_filter: MemoryTypeFilter::PREFER_HOST
-						| MemoryTypeFilter::HOST_SEQUENTIAL_WRITE,
-					..Default::default()
-				},
-				image_data.len() as DeviceSize,
-			)
-			.unwrap();
-
-			buffer.write().unwrap().copy_from_slice(&image_data);
-
-			cmd_buf.update_image(
+			let offset = [x as _, y as _, 0];
+			cmd_buf.copy_image(
+				old_image.clone(),
+				offset,
 				image.clone(),
-				&image_data,
-				[x as _, y as _, 0],
+				offset,
 				Some([width as _, height as _, 1]),
 			)?;
 		}
@@ -325,13 +282,6 @@ impl Kind {
 					Format::R8G8B8A8_UNORM
 				}
 			}
-		}
-	}
-
-	fn as_content_type(&self) -> ContentType {
-		match self {
-			Self::Mask => ContentType::Mask,
-			Self::Color { .. } => ContentType::Color,
 		}
 	}
 }
@@ -404,11 +354,10 @@ impl TextAtlas {
 		font_system: &mut FontSystem,
 		cache: &mut SwashCache,
 		content_type: ContentType,
-		scale_factor: f32,
 	) -> anyhow::Result<bool> {
 		let did_grow = match content_type {
-			ContentType::Mask => self.mask_atlas.grow(font_system, cache, scale_factor)?,
-			ContentType::Color => self.color_atlas.grow(font_system, cache, scale_factor)?,
+			ContentType::Mask => self.mask_atlas.grow(font_system, cache)?,
+			ContentType::Color => self.color_atlas.grow(font_system, cache)?,
 		};
 
 		if did_grow {

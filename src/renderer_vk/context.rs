@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use cosmic_text::{Attrs, Buffer, Shaping};
+use cosmic_text::Buffer;
 
 use crate::{
 	drawing,
