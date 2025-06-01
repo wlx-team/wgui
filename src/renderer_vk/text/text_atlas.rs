@@ -52,10 +52,10 @@ impl TextPipeline {
 #[repr(C)]
 #[derive(BufferContents, Vertex, Copy, Clone, Debug, Default)]
 pub struct GlyphVertex {
-	#[format(R32G32_SINT)]
-	pub in_pos: [i32; 2],
 	#[format(R32_UINT)]
-	pub in_dim: [u16; 2],
+	pub in_model_idx: u32,
+	#[format(R32_UINT)]
+	pub in_rect_dim: [u16; 2],
 	#[format(R32_UINT)]
 	pub in_uv: [u16; 2],
 	#[format(R32_UINT)]

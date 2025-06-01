@@ -181,11 +181,8 @@ where
 		)?)
 	}
 
-	pub fn uniform_buffer<T>(
-		&self,
-		set: usize,
-		buffer: Subbuffer<[T]>,
-	) -> anyhow::Result<Arc<DescriptorSet>>
+	// uniform or storage buffer
+	pub fn buffer<T>(&self, set: usize, buffer: Subbuffer<[T]>) -> anyhow::Result<Arc<DescriptorSet>>
 	where
 		T: BufferContents + Copy,
 	{
@@ -222,6 +219,6 @@ where
 			subbuffer
 		};
 
-		self.uniform_buffer(set, uniform_buffer_subbuffer)
+		self.buffer(set, uniform_buffer_subbuffer)
 	}
 }

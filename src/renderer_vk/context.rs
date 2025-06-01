@@ -39,6 +39,7 @@ impl RendererPass<'_> {
 
 	fn submit(
 		&mut self,
+		gfx: &Arc<WGfx>,
 		viewport: &mut Viewport,
 		cmd_buf: &mut GfxCommandBuffer,
 		text_atlas: &mut TextAtlas,
@@ -47,8 +48,7 @@ impl RendererPass<'_> {
 			return Ok(());
 		}
 		self.submitted = true;
-
-		self.rect_renderer.render(viewport, cmd_buf)?;
+		self.rect_renderer.render(gfx, viewport, cmd_buf)?;
 
 		{
 			let mut font_system = FONT_SYSTEM.lock().unwrap();
@@ -74,7 +74,7 @@ pub struct Context {
 	text_atlas: TextAtlas,
 	rect_pipeline: RectPipeline,
 	text_pipeline: TextPipeline,
-	scale: f32,
+	pixel_scale: f32,
 	pub dirty: bool,
 	empty_text: Rc<RefCell<Buffer>>,
 }
@@ -83,7 +83,7 @@ impl Context {
 	pub fn new(
 		gfx: Arc<WGfx>,
 		native_format: vulkano::format::Format,
-		scale: f32,
+		pixel_scale: f32,
 	) -> anyhow::Result<Self> {
 		let rect_pipeline = RectPipeline::new(gfx.clone(), native_format)?;
 		let text_pipeline = TextPipeline::new(gfx.clone(), native_format)?;
@@ -95,7 +95,7 @@ impl Context {
 			text_atlas,
 			rect_pipeline,
 			text_pipeline,
-			scale,
+			pixel_scale,
 			dirty: true,
 			empty_text: Rc::new(RefCell::new(Buffer::new_empty(DEFAULT_METRICS))),
 		})
@@ -107,15 +107,28 @@ impl Context {
 		Ok(())
 	}
 
-	pub fn update_viewport(&mut self, resolution: [u32; 2], scale: f32) -> anyhow::Result<()> {
-		if self.scale != scale {
-			self.scale = scale;
+	pub fn update_viewport(&mut self, resolution: [u32; 2], pixel_scale: f32) -> anyhow::Result<()> {
+		if self.pixel_scale != pixel_scale {
+			self.pixel_scale = pixel_scale;
 			self.regen()?;
 		}
+
 		if self.viewport.resolution() != resolution {
 			self.dirty = true;
 		}
-		self.viewport.update(resolution)?;
+
+		let near = -1.0;
+		let far = 1.0;
+		let projection = glam::Mat4::orthographic_rh(
+			0.0,
+			(resolution[0] as f32) / pixel_scale,
+			0.0,
+			(resolution[1] as f32) / pixel_scale,
+			near,
+			far,
+		);
+
+		self.viewport.update(resolution, &projection, pixel_scale)?;
 		Ok(())
 	}
 
@@ -130,15 +143,17 @@ impl Context {
 
 	fn submit_pass(
 		&mut self,
+		gfx: &Arc<WGfx>,
 		cmd_buf: &mut GfxCommandBuffer,
 		pass: &mut RendererPass,
 	) -> anyhow::Result<()> {
-		pass.submit(&mut self.viewport, cmd_buf, &mut self.text_atlas)?;
+		pass.submit(gfx, &mut self.viewport, cmd_buf, &mut self.text_atlas)?;
 		Ok(())
 	}
 
 	pub fn draw(
 		&mut self,
+		gfx: &Arc<WGfx>,
 		cmd_buf: &mut GfxCommandBuffer,
 		primitives: &[drawing::RenderPrimitive],
 	) -> anyhow::Result<()> {
@@ -153,15 +168,15 @@ impl Context {
 				drawing::PrimitivePayload::Rectangle(rectangle) => {
 					pass
 						.rect_renderer
-						.add_rect(primitive.boundary, *rectangle, self.scale, primitive.depth);
+						.add_rect(primitive.boundary, *rectangle, primitive.depth);
 				}
 				drawing::PrimitivePayload::Text(text) => {
 					pass.text_areas.push(TextArea {
 						buffer: text.clone(),
-						left: primitive.boundary.x * self.scale,
-						top: primitive.boundary.y * self.scale,
+						left: primitive.boundary.x * self.pixel_scale,
+						top: primitive.boundary.y * self.pixel_scale,
 						bounds: TextBounds::default(), //FIXME: just using boundary coords here doesn't work
-						scale: self.scale,
+						scale: self.pixel_scale,
 						default_color: cosmic_text::Color::rgb(0, 0, 0),
 						custom_glyphs: &[],
 						depth: primitive.depth,
@@ -170,10 +185,10 @@ impl Context {
 				drawing::PrimitivePayload::Sprite(sprites) => {
 					pass.text_areas.push(TextArea {
 						buffer: self.empty_text.clone(),
-						left: primitive.boundary.x * self.scale,
-						top: primitive.boundary.y * self.scale,
+						left: primitive.boundary.x * self.pixel_scale,
+						top: primitive.boundary.y * self.pixel_scale,
 						bounds: TextBounds::default(),
-						scale: self.scale,
+						scale: self.pixel_scale,
 						custom_glyphs: sprites.as_slice(),
 						default_color: cosmic_text::Color::rgb(255, 0, 255),
 						depth: primitive.depth,
@@ -183,7 +198,7 @@ impl Context {
 		}
 
 		let pass = passes.last_mut().unwrap();
-		self.submit_pass(cmd_buf, pass)?;
+		self.submit_pass(gfx, cmd_buf, pass)?;
 
 		Ok(())
 	}

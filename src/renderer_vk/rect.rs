@@ -1,5 +1,6 @@
 use std::sync::Arc;
 
+use glam::{Vec2, Vec3};
 use vulkano::{
 	buffer::{BufferContents, BufferUsage, Subbuffer},
 	format::Format,
@@ -9,6 +10,7 @@ use vulkano::{
 use crate::{
 	drawing::{Boundary, Rectangle},
 	gfx::{BLEND_ALPHA, WGfx, cmd::GfxCommandBuffer, pipeline::WGfxPipeline},
+	renderer_vk::model_buffer::ModelBuffer,
 };
 
 use super::viewport::Viewport;
@@ -16,10 +18,10 @@ use super::viewport::Viewport;
 #[repr(C)]
 #[derive(BufferContents, Vertex, Copy, Clone, Debug)]
 pub struct RectVertex {
-	#[format(R32G32_SINT)]
-	pub in_pos: [i32; 2],
 	#[format(R32_UINT)]
-	pub in_dim: [u16; 2],
+	pub in_model_idx: u32,
+	#[format(R32_UINT)]
+	pub in_rect_dim: [u16; 2],
 	#[format(R32_UINT)]
 	pub in_color: u32,
 	#[format(R32_UINT)]
@@ -62,6 +64,7 @@ pub struct RectRenderer {
 	rect_vertices: Vec<RectVertex>,
 	vert_buffer: Subbuffer<[RectVertex]>,
 	vert_buffer_size: usize,
+	model_buffer: ModelBuffer,
 }
 
 impl RectRenderer {
@@ -74,6 +77,7 @@ impl RectRenderer {
 		)?;
 
 		Ok(Self {
+			model_buffer: ModelBuffer::new(&pipeline.gfx)?,
 			pipeline,
 			rect_vertices: vec![],
 			vert_buffer,
@@ -81,16 +85,21 @@ impl RectRenderer {
 		})
 	}
 
-	pub fn add_rect(&mut self, boundary: Boundary, rectangle: Rectangle, scale: f32, depth: f32) {
+	pub fn add_rect(&mut self, boundary: Boundary, rectangle: Rectangle, depth: f32) {
+		let in_model_idx = self.model_buffer.register_pos_size(
+			&Vec2::new(boundary.x, boundary.y),
+			&Vec2::new(boundary.w, boundary.h),
+		);
+
 		self.rect_vertices.push(RectVertex {
-			in_pos: [(boundary.x * scale) as _, (boundary.y * scale) as _],
-			in_dim: [(boundary.w * scale) as _, (boundary.h * scale) as _],
+			in_model_idx,
+			in_rect_dim: [boundary.w as u16, boundary.h as u16],
 			in_color: cosmic_text::Color::from(rectangle.color).0,
 			in_color2: cosmic_text::Color::from(rectangle.color2).0,
 			in_border_color: cosmic_text::Color::from(rectangle.border_color).0,
 			round_border_gradient_srgb: [
-				(rectangle.round * scale * 255.0) as u8,
-				(rectangle.border * scale) as u8,
+				(rectangle.round * 255.0) as u8,
+				(rectangle.border) as u8,
 				rectangle.gradient as u8,
 				0, //FIXME: srgb vs linear?
 			],
@@ -115,21 +124,24 @@ impl RectRenderer {
 
 	pub fn render(
 		&mut self,
+		gfx: &Arc<WGfx>,
 		viewport: &mut Viewport,
 		cmd_buf: &mut GfxCommandBuffer,
 	) -> anyhow::Result<()> {
 		let vp = viewport.resolution();
 
-		let set0 = viewport.get_rect_descriptor(&self.pipeline);
-
+		self.model_buffer.upload(gfx)?;
 		self.upload_verts()?;
+
+		let set0 = viewport.get_rect_descriptor(&self.pipeline);
+		let set1 = self.model_buffer.get_rect_descriptor(&self.pipeline);
 
 		let pass = self.pipeline.color_rect.create_pass_instanced(
 			[vp[0] as _, vp[1] as _],
 			self.vert_buffer.clone(),
 			0..4,
 			0..self.rect_vertices.len() as _,
-			vec![set0],
+			vec![set0, set1],
 		)?;
 
 		self.rect_vertices.clear();
