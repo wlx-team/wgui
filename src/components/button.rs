@@ -6,7 +6,7 @@ use taffy::{AlignItems, JustifyContent, prelude::length};
 use crate::{
 	animation::{Animation, AnimationEasing},
 	drawing::{self, Color},
-	event::EventListener,
+	event::{EventListener, WidgetCallback},
 	layout::{Layout, WidgetID},
 	renderer_vk::text::{FontWeight, TextStyle},
 	widget::{
@@ -37,6 +37,20 @@ pub struct Button {
 	color: drawing::Color,
 	pub body: WidgetID,    // Rectangle
 	pub text_id: WidgetID, // Text
+	text_node: taffy::NodeId,
+}
+
+impl Button {
+	pub fn set_text<'a, C>(&self, callback_data: &mut C, text: &str)
+	where
+		C: WidgetCallback<'a>,
+	{
+		callback_data.call_on_widget(self.text_id, |label: &mut TextLabel| {
+			label.set_text(text);
+		});
+		callback_data.mark_redraw();
+		callback_data.mark_dirty(self.text_node);
+	}
 }
 
 fn anim_hover_in(button: Arc<Button>, widget_id: WidgetID) -> Animation {
@@ -101,7 +115,7 @@ pub fn construct(
 
 	let light_text = (params.color.r + params.color.g + params.color.b) < 1.5;
 
-	let (text_id, _) = layout.add_child(
+	let (text_id, text_node) = layout.add_child(
 		rect_id,
 		TextLabel::create(TextParams {
 			content: String::from(params.text),
@@ -126,6 +140,7 @@ pub fn construct(
 		body: rect_id,
 		color: params.color,
 		text_id,
+		text_node,
 	});
 
 	// Highlight background on mouse enter

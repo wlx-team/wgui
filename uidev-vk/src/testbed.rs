@@ -1,10 +1,10 @@
+use wgui::widget::text::TextLabel;
 use wgui::{
 	drawing::{self},
 	event::EventListener,
 	glam::Vec2,
 	layout::Layout,
 	renderer_vk::text::TextStyle,
-	widget::text::TextLabel,
 };
 
 pub struct Testbed {
@@ -59,10 +59,7 @@ impl Testbed {
 		layout.add_event_listener(
 			button.body,
 			EventListener::MouseClick(Box::new(move |data| {
-				data.call_on_widget(button.text_id, |label: &mut TextLabel| {
-					label.set_text("Congratulations!");
-				});
-				data.needs_redraw = true;
+				button.set_text(data, "Congratulations!");
 			})),
 		);
 

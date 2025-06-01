@@ -89,9 +89,10 @@ impl Layout {
 		parent_node_id: taffy::NodeId,
 		state: &mut PushEventState,
 		event: &event::Event,
+		dirty_nodes: &mut Vec<taffy::NodeId>,
 	) -> anyhow::Result<()> {
 		for child_id in self.tree.child_ids(parent_node_id) {
-			self.push_event_widget(state, child_id, event)?;
+			self.push_event_widget(state, child_id, event, dirty_nodes)?;
 		}
 
 		Ok(())
@@ -102,6 +103,7 @@ impl Layout {
 		state: &mut PushEventState,
 		node_id: taffy::NodeId,
 		event: &event::Event,
+		dirty_nodes: &mut Vec<taffy::NodeId>,
 	) -> anyhow::Result<()> {
 		let l = self.tree.layout(node_id)?;
 		let Some(widget_id) = self.tree.get_node_context(node_id).cloned() else {
@@ -134,11 +136,12 @@ impl Layout {
 				transform_stack: state.transform_stack,
 				widgets: &self.widget_states,
 				tree: &self.tree,
-				animations: &mut state.animations,
+				animations: state.animations,
 				needs_redraw: &mut state.needs_redraw,
 				node_id,
 				style,
 				taffy_layout: l,
+				dirty_nodes,
 			},
 		) {
 			widget::EventResult::Pass => {
@@ -155,7 +158,7 @@ impl Layout {
 		drop(widget); // free mutex
 
 		if iter_children {
-			self.push_event_children(node_id, state, event)?;
+			self.push_event_children(node_id, state, event, dirty_nodes)?;
 		}
 
 		state.transform_stack.pop();
@@ -175,6 +178,7 @@ impl Layout {
 	pub fn push_event(&mut self, event: &event::Event) -> anyhow::Result<()> {
 		let mut transform_stack = TransformStack::new();
 		let mut animations_to_add = Vec::<animation::Animation>::new();
+		let mut dirty_nodes = Vec::new();
 
 		let mut state = PushEventState {
 			needs_redraw: false,
@@ -182,7 +186,11 @@ impl Layout {
 			animations: &mut animations_to_add,
 		};
 
-		self.push_event_widget(&mut state, self.root_node, event)?;
+		self.push_event_widget(&mut state, self.root_node, event, &mut dirty_nodes)?;
+
+		for node in dirty_nodes {
+			self.tree.mark_dirty(node)?;
+		}
 
 		if state.needs_redraw {
 			self.needs_redraw = true;
@@ -228,9 +236,18 @@ impl Layout {
 	}
 
 	pub fn update(&mut self, size: Vec2, timestep_alpha: f32) -> anyhow::Result<()> {
-		self
-			.animations
-			.process(&self.widget_states, timestep_alpha, &mut self.needs_redraw);
+		let mut dirty_nodes = Vec::new();
+
+		self.animations.process(
+			&self.widget_states,
+			&mut dirty_nodes,
+			timestep_alpha,
+			&mut self.needs_redraw,
+		);
+
+		for node in dirty_nodes {
+			self.tree.mark_dirty(node)?;
+		}
 
 		if self.tree.dirty(self.root_node)? || self.prev_size != size {
 			self.needs_redraw = true;
@@ -270,10 +287,20 @@ impl Layout {
 		Ok(())
 	}
 
-	pub fn tick(&mut self) {
-		self
-			.animations
-			.tick(&self.widget_states, &mut self.needs_redraw);
+	pub fn tick(&mut self) -> anyhow::Result<()> {
+		let mut dirty_nodes = Vec::new();
+
+		self.animations.tick(
+			&self.widget_states,
+			&mut dirty_nodes,
+			&mut self.needs_redraw,
+		);
+
+		for node in dirty_nodes {
+			self.tree.mark_dirty(node)?;
+		}
+
+		Ok(())
 	}
 
 	// helper function

@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use glam::Vec3;
 use vulkano::{
-	buffer::{BufferContents, BufferUsage, Subbuffer},
+	buffer::{BufferUsage, Subbuffer},
 	descriptor_set::DescriptorSet,
 };
 

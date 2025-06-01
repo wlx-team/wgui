@@ -50,22 +50,13 @@ impl Event {
 	}
 }
 
-pub struct CallbackData<'a> {
-	pub obj: &'a mut dyn WidgetObj,
-	pub animations: &'a mut Vec<animation::Animation>,
-	pub widgets: &'a WidgetMap,
-	pub widget_id: WidgetID,
-	pub node_id: taffy::NodeId,
-	pub needs_redraw: bool,
-}
-
-impl CallbackData<'_> {
-	pub fn call_on_widget<WIDGET, FUNC>(&self, widget_id: WidgetID, func: FUNC)
+pub trait WidgetCallback<'a> {
+	fn call_on_widget<WIDGET, FUNC>(&self, widget_id: WidgetID, func: FUNC)
 	where
 		WIDGET: WidgetObj,
 		FUNC: FnOnce(&mut WIDGET),
 	{
-		let Some(widget) = self.widgets.get(widget_id) else {
+		let Some(widget) = self.get_widgets().get(widget_id) else {
 			debug_assert!(false);
 			return;
 		};
@@ -74,6 +65,34 @@ impl CallbackData<'_> {
 		let m = lock.obj.get_as_mut::<WIDGET>();
 
 		func(m);
+	}
+
+	fn get_widgets(&self) -> &'a WidgetMap;
+	fn mark_redraw(&mut self);
+	fn mark_dirty(&mut self, node_id: taffy::NodeId);
+}
+
+pub struct CallbackData<'a> {
+	pub obj: &'a mut dyn WidgetObj,
+	pub animations: &'a mut Vec<animation::Animation>,
+	pub widgets: &'a WidgetMap,
+	pub widget_id: WidgetID,
+	pub node_id: taffy::NodeId,
+	pub dirty_nodes: &'a mut Vec<taffy::NodeId>,
+	pub needs_redraw: bool,
+}
+
+impl<'a> WidgetCallback<'a> for CallbackData<'a> {
+	fn get_widgets(&self) -> &'a WidgetMap {
+		self.widgets
+	}
+
+	fn mark_redraw(&mut self) {
+		self.needs_redraw = true;
+	}
+
+	fn mark_dirty(&mut self, node_id: taffy::NodeId) {
+		self.dirty_nodes.push(node_id);
 	}
 }
 

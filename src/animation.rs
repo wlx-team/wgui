@@ -1,6 +1,7 @@
 use glam::FloatExt;
 
 use crate::{
+	event::WidgetCallback,
 	layout::{WidgetID, WidgetMap},
 	widget::WidgetObj,
 };
@@ -39,23 +40,20 @@ pub struct CallbackData<'a> {
 	pub widget_id: WidgetID,
 	pub pos: f32, // 0.0 (start of animation) - 1.0 (end of animation)
 	pub needs_redraw: bool,
+	pub dirty_nodes: &'a mut Vec<taffy::NodeId>,
 }
 
-impl CallbackData<'_> {
-	pub fn call_on_widget<WIDGET, FUNC>(&self, widget_id: WidgetID, func: FUNC)
-	where
-		WIDGET: WidgetObj,
-		FUNC: FnOnce(&mut WIDGET),
-	{
-		let Some(widget) = self.widgets.get(widget_id) else {
-			debug_assert!(false);
-			return;
-		};
+impl<'a> WidgetCallback<'a> for CallbackData<'a> {
+	fn get_widgets(&self) -> &'a WidgetMap {
+		self.widgets
+	}
 
-		let mut lock = widget.lock().unwrap();
-		let m = lock.obj.get_as_mut::<WIDGET>();
+	fn mark_redraw(&mut self) {
+		self.needs_redraw = true;
+	}
 
-		func(m);
+	fn mark_dirty(&mut self, node_id: taffy::NodeId) {
+		self.dirty_nodes.push(node_id);
 	}
 }
 
@@ -73,6 +71,11 @@ pub struct Animation {
 	last_tick: bool,
 
 	callback: Box<dyn Fn(&mut CallbackData)>,
+}
+
+#[derive(Default)]
+struct CallResult {
+	needs_redraw: bool,
 }
 
 impl Animation {
@@ -105,14 +108,20 @@ impl Animation {
 		}
 	}
 
-	fn call(&self, widgets: &WidgetMap, pos: f32) -> bool {
-		let mut needs_redraw = false;
+	fn call(
+		&self,
+		widgets: &WidgetMap,
+		dirty_nodes: &mut Vec<taffy::NodeId>,
+		pos: f32,
+	) -> CallResult {
+		let mut res = CallResult::default();
 
 		if let Some(widget) = widgets.get(self.target_widget).cloned() {
 			let mut widget = widget.lock().unwrap();
 
 			let data = &mut CallbackData {
 				widget_id: self.target_widget,
+				dirty_nodes,
 				widgets,
 				obj: widget.obj.as_mut(),
 				pos,
@@ -122,11 +131,11 @@ impl Animation {
 			(self.callback)(data);
 
 			if data.needs_redraw {
-				needs_redraw = true;
+				res.needs_redraw = true;
 			}
 		}
 
-		needs_redraw
+		res
 	}
 }
 
@@ -141,7 +150,12 @@ impl Animations {
 		}
 	}
 
-	pub fn tick(&mut self, widgets: &WidgetMap, needs_redraw: &mut bool) {
+	pub fn tick(
+		&mut self,
+		widgets: &WidgetMap,
+		dirty_nodes: &mut Vec<taffy::NodeId>,
+		needs_redraw: &mut bool,
+	) {
 		for anim in &mut self.running_animations {
 			let x = 1.0 - (anim.ticks_remaining as f32 / anim.ticks_duration as f32);
 			let pos = if anim.ticks_remaining > 0 {
@@ -154,7 +168,9 @@ impl Animations {
 			anim.pos_prev = anim.pos;
 			anim.pos = pos;
 
-			if anim.last_tick && anim.call(widgets, 1.0) {
+			let res = anim.call(widgets, dirty_nodes, 1.0);
+
+			if anim.last_tick || res.needs_redraw {
 				*needs_redraw = true;
 			}
 
@@ -166,10 +182,18 @@ impl Animations {
 			.retain(|anim| anim.ticks_remaining > 0);
 	}
 
-	pub fn process(&mut self, widgets: &WidgetMap, alpha: f32, needs_redraw: &mut bool) {
+	pub fn process(
+		&mut self,
+		widgets: &WidgetMap,
+		dirty_nodes: &mut Vec<taffy::NodeId>,
+		alpha: f32,
+		needs_redraw: &mut bool,
+	) {
 		for anim in &mut self.running_animations {
 			let pos = anim.pos_prev.lerp(anim.pos, alpha);
-			if anim.call(widgets, pos) {
+			let res = anim.call(widgets, dirty_nodes, pos);
+
+			if res.needs_redraw {
 				*needs_redraw = true;
 			}
 		}

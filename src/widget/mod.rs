@@ -72,6 +72,7 @@ pub struct EventParams<'a> {
 	pub transform_stack: &'a TransformStack,
 	pub animations: &'a mut Vec<animation::Animation>,
 	pub needs_redraw: &'a mut bool,
+	pub dirty_nodes: &'a mut Vec<taffy::NodeId>,
 }
 
 pub enum EventResult {
@@ -268,6 +269,7 @@ impl WidgetState {
 			obj: self.obj.as_mut(),
 			widgets: params.widgets,
 			animations: params.animations,
+			dirty_nodes: params.dirty_nodes,
 			widget_id,
 			node_id,
 			needs_redraw: false,

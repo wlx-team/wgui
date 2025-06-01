@@ -216,7 +216,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 				}
 
 				while timestep.on_tick() {
-					testbed.layout.tick();
+					testbed.layout.tick().unwrap();
 				}
 
 				testbed
