@@ -13,7 +13,9 @@ layout(location = 7) in float scale;
 
 layout(location = 0) out vec4 out_color;
 layout(location = 1) out vec2 out_uv;
-layout(location = 2) flat out uint content_type;
+layout(location = 2) flat out vec4 out_uv_range;
+layout(location = 3) flat out vec2 out_texel_size;
+layout(location = 4) flat out uint content_type;
 
 layout(set = 0, binding = 0) uniform sampler2D color_atlas;
 layout(set = 1, binding = 0) uniform sampler2D mask_atlas;
@@ -41,9 +43,12 @@ void main() {
 
   uvec2 uv = uvec2(in_uv & 0xffffu, (in_uv & 0xffff0000u) >> 16u);
 
+  uvec2 uv_center = uv;
+  uvec2 rect_extent = uvec2(rect_width, rect_height);
+
   uvec2 corner_pos_u = uvec2(v & 1u, (v >> 1u) & 1u);
   vec2 corner_pos = vec2(corner_pos_u);
-  uvec2 corner_offset = uvec2(rect_width, rect_height) * corner_pos_u;
+  uvec2 corner_offset = rect_extent * corner_pos_u;
   uv = uv + corner_offset;
 
   mat4 model_matrix = model_buffer.models[in_model_idx];
@@ -74,5 +79,9 @@ void main() {
     dim = uvec2(textureSize(mask_atlas, 0));
   }
 
-  out_uv = vec2(uv) / vec2(dim);
+  vec2 dimf = vec2(dim);
+
+  out_uv = vec2(uv) / dimf;
+  out_texel_size = 0.5 / dimf;
+  out_uv_range = vec4(vec2(uv_center - rect_extent) / dimf, vec2(uv_center + rect_extent) / dimf);
 }

@@ -8,7 +8,7 @@ use vulkano::{
 	command_buffer::CommandBufferUsage,
 	descriptor_set::DescriptorSet,
 	format::Format,
-	image::{Image, ImageCreateInfo, ImageType, ImageUsage, view::ImageView},
+	image::{Image, ImageCreateInfo, ImageType, ImageUsage, sampler::Filter, view::ImageView},
 	memory::allocator::AllocationCreateInfo,
 	pipeline::graphics::{input_assembly::PrimitiveTopology, vertex_input::Vertex},
 };
@@ -114,7 +114,7 @@ impl InnerAtlas {
 		let image_descriptor = common.inner.uniform_sampler(
 			Self::descriptor_set(kind),
 			image_view.clone(),
-			common.gfx.texture_filter,
+			Filter::Nearest,
 		)?;
 
 		let glyph_cache = LruCache::unbounded_with_hasher(Hasher::default());
@@ -254,7 +254,7 @@ impl InnerAtlas {
 		self.image_descriptor = self.common.inner.uniform_sampler(
 			Self::descriptor_set(self.kind),
 			self.image_view.clone(),
-			self.common.gfx.texture_filter,
+			Filter::Nearest,
 		)?;
 		Ok(())
 	}
