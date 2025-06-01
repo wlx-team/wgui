@@ -1,3 +1,5 @@
+use std::{cell::RefCell, rc::Rc};
+
 use cosmic_text::Buffer;
 use glam::Vec2;
 use taffy::TraversePartialTree;
@@ -91,7 +93,7 @@ pub struct Rectangle {
 pub enum RenderPrimitive {
 	Submit,
 	Rectangle(Boundary, Rectangle),
-	Text(Boundary, Buffer),
+	Text(Boundary, Rc<RefCell<Buffer>>),
 	Sprite(Boundary, Option<CustomGlyph>), //option because we want as_slice
 }
 

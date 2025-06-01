@@ -149,8 +149,9 @@ impl TextRenderer {
 				start_y_physical <= text_area.bounds.bottom && text_area.bounds.top <= end_y_physical
 			};
 
-			let layout_runs = text_area
-				.buffer
+			let buffer = text_area.buffer.borrow();
+
+			let layout_runs = buffer
 				.layout_runs()
 				.skip_while(|run| !is_run_visible(run))
 				.take_while(is_run_visible);

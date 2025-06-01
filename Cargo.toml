@@ -8,7 +8,13 @@ anyhow = "1.0.98"
 cosmic-text = "0.14.2"
 etagere = "0.2.15"
 glam = "0.30.3"
-image = { version = "0.25.6", default-features = false, features = ["gif", "jpeg", "png", "rayon", "webp"] }
+image = { version = "0.25.6", default-features = false, features = [
+  "gif",
+  "jpeg",
+  "png",
+  "rayon",
+  "webp",
+] }
 log = "0.4.27"
 lru = "0.14.0"
 resvg = { version = "0.45.1", default-features = false }
@@ -21,3 +27,10 @@ vulkano = { version = "0.35.1", default-features = false, features = [
   "macros",
 ] }
 vulkano-shaders = "0.35.0"
+
+[profile.dev]
+opt-level = 0
+debug = true
+strip = "none"
+debug-assertions = true
+incremental = true
