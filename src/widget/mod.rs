@@ -14,6 +14,7 @@ pub mod div;
 pub mod rectangle;
 pub mod sprite;
 pub mod text;
+pub mod util;
 
 pub struct WidgetData {
 	pub hovered: bool,
@@ -164,7 +165,7 @@ impl WidgetState {
 			color: drawing::Color::new(1.0, 1.0, 1.0, 0.0),
 			border: 2.0,
 			border_color: drawing::Color::new(1.0, 1.0, 1.0, 1.0),
-			round: 1.0,
+			round_units: 2,
 			..Default::default()
 		};
 

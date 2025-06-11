@@ -8,7 +8,7 @@ use crate::{
 	layout::BoxWidget,
 	renderer_vk::text::custom_glyph::CustomGlyph,
 	transform_stack::{self, TransformStack},
-	widget,
+	widget::{self},
 };
 
 use super::{layout::Layout, widget::DrawState};
@@ -78,7 +78,7 @@ pub struct Rectangle {
 	pub border: f32, // width in pixels
 	pub border_color: Color,
 
-	pub round: f32, // 0.0 - 1.0
+	pub round_units: u8,
 }
 
 pub struct RenderPrimitive {

@@ -50,9 +50,8 @@ void main() {
            float(in_border_color & 0x000000ffu) / 255.0,
            float((in_border_color & 0xff000000u) >> 24u) / 255.0);
 
-  float radius = min((float(round_border_gradient & 0xffu) / 255.0),
-                     rect_aspect);         // 0.0 - 1.0
-  out_radius = radius * rect_size.y / 2.0; // radius in units
+  float radius = float(round_border_gradient & 0xffu);
+  out_radius = radius;
 
   float border_size = float((round_border_gradient & 0xff00u) >> 8);
   out_border_size = border_size;

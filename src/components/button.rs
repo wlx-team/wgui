@@ -12,6 +12,7 @@ use crate::{
 	widget::{
 		rectangle::{Rectangle, RectangleParams},
 		text::{TextLabel, TextParams},
+		util::WLength,
 	},
 };
 
@@ -98,7 +99,7 @@ pub fn construct(
 		parent,
 		Rectangle::create(RectangleParams {
 			color: params.color,
-			round: 0.1,
+			round: WLength::Units(4.0),
 			..Default::default()
 		})?,
 		taffy::Style {

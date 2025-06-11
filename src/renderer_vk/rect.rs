@@ -104,7 +104,7 @@ impl RectRenderer {
 			in_color2: cosmic_text::Color::from(rectangle.color2).0,
 			in_border_color: cosmic_text::Color::from(rectangle.border_color).0,
 			round_border_gradient: [
-				(rectangle.round * 255.0) as u8,
+				rectangle.round_units,
 				(rectangle.border) as u8,
 				rectangle.gradient as u8,
 				0, // unused

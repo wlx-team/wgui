@@ -17,6 +17,7 @@ use crate::{
 		rectangle::{Rectangle, RectangleParams},
 		sprite::{SpriteBox, SpriteBoxParams},
 		text::{TextLabel, TextParams},
+		util::WLength,
 	},
 };
 
@@ -105,30 +106,35 @@ fn parse_val(value: &str) -> Option<f32> {
 	Some(val)
 }
 
+fn is_percent(value: &str) -> bool {
+	value.ends_with("%")
+}
+
+fn parse_percent(value: &str) -> Option<f32> {
+	let Some(val_str) = value.split("%").next() else {
+		print_invalid_value(value);
+		return None;
+	};
+
+	let Ok(val) = val_str.parse::<f32>() else {
+		print_invalid_value(value);
+		return None;
+	};
+	Some(val / 100.0)
+}
+
+fn parse_f32(value: &str) -> Option<f32> {
+	value.parse::<f32>().ok()
+}
+
 fn parse_size_unit<T>(value: &str) -> Option<T>
 where
 	T: taffy::prelude::FromPercent + taffy::prelude::FromLength,
 {
-	if value.ends_with("%") {
-		// percentage mode
-		let Some(val_str) = value.split("%").next() else {
-			print_invalid_value(value);
-			return None;
-		};
-
-		let Ok(val) = val_str.parse::<f32>() else {
-			print_invalid_value(value);
-			return None;
-		};
-
-		Some(taffy::prelude::percent(val / 100.0))
+	if is_percent(value) {
+		Some(taffy::prelude::percent(parse_percent(value)?))
 	} else {
-		// normal mode
-		let Ok(val) = value.parse::<f32>() else {
-			print_invalid_value(value);
-			return None;
-		};
-		Some(taffy::prelude::length(val))
+		Some(taffy::prelude::length(parse_f32(value)?))
 	}
 }
 
@@ -426,10 +432,17 @@ fn parse_widget_rectangle<'a>(
 				}
 			}
 			"round" => {
-				params.round = value.parse().unwrap_or_else(|_| {
-					print_invalid_attrib(key, value);
-					0.0
-				});
+				if is_percent(value) {
+					if let Some(val) = parse_percent(value) {
+						params.round = WLength::Percent(val);
+					} else {
+						print_invalid_value(value);
+					}
+				} else if let Some(val) = parse_f32(value) {
+					params.round = WLength::Units(val);
+				} else {
+					print_invalid_value(value);
+				}
 			}
 			"border" => {
 				params.border = value.parse().unwrap_or_else(|_| {
