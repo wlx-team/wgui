@@ -61,7 +61,7 @@ pub struct GlyphVertex {
 	#[format(R32_UINT)]
 	pub in_color: u32,
 	#[format(R32_UINT)]
-	pub content_type_with_srgb: [u16; 2],
+	pub in_content_type: [u16; 2], // 2 bytes unused! TODO
 	#[format(R32_SFLOAT)]
 	pub depth: f32,
 	#[format(R32_SFLOAT)]
@@ -263,52 +263,23 @@ impl InnerAtlas {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(super) enum Kind {
 	Mask,
-	Color { srgb: bool },
+	Color,
 }
 
 impl Kind {
 	fn num_channels(self) -> usize {
 		match self {
 			Kind::Mask => 1,
-			Kind::Color { .. } => 4,
+			Kind::Color => 4,
 		}
 	}
 
 	fn texture_format(self) -> Format {
 		match self {
 			Kind::Mask => Format::R8_UNORM,
-			Kind::Color { srgb } => {
-				if srgb {
-					Format::R8G8B8A8_SRGB
-				} else {
-					Format::R8G8B8A8_UNORM
-				}
-			}
+			Kind::Color => Format::R8G8B8A8_UNORM,
 		}
 	}
-}
-
-/// The color mode of a [`TextAtlas`].
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum ColorMode {
-	/// Accurate color management.
-	///
-	/// This mode will use a proper sRGB texture for colored glyphs. This will
-	/// produce physically accurate color blending when rendering.
-	Accurate,
-
-	/// Web color management.
-	///
-	/// This mode reproduces the color management strategy used in the Web and
-	/// implemented by browsers.
-	///
-	/// This entails storing glyphs colored using the sRGB color space in a
-	/// linear RGB texture. Blending will not be physically accurate, but will
-	/// produce the same results as most UI toolkits.
-	///
-	/// This mode should be used to render to a linear RGB texture containing
-	/// sRGB colors.
-	Web,
 }
 
 /// An atlas containing a cache of rasterized glyphs that can be rendered.
@@ -316,33 +287,18 @@ pub struct TextAtlas {
 	pub(super) common: TextPipeline,
 	pub(super) color_atlas: InnerAtlas,
 	pub(super) mask_atlas: InnerAtlas,
-	pub(super) color_mode: ColorMode,
 }
 
 impl TextAtlas {
 	/// Creates a new [`TextAtlas`].
 	pub fn new(common: TextPipeline) -> anyhow::Result<Self> {
-		Self::with_color_mode(common, ColorMode::Accurate)
-	}
-
-	/// Creates a new [`TextAtlas`] with the given [`ColorMode`].
-	pub fn with_color_mode(common: TextPipeline, color_mode: ColorMode) -> anyhow::Result<Self> {
-		let color_atlas = InnerAtlas::new(
-			common.clone(),
-			Kind::Color {
-				srgb: match color_mode {
-					ColorMode::Accurate => true,
-					ColorMode::Web => false,
-				},
-			},
-		)?;
+		let color_atlas = InnerAtlas::new(common.clone(), Kind::Color)?;
 		let mask_atlas = InnerAtlas::new(common.clone(), Kind::Mask)?;
 
 		Ok(Self {
 			common,
 			color_atlas,
 			mask_atlas,
-			color_mode,
 		})
 	}
 

@@ -29,7 +29,7 @@ pub struct RectVertex {
 	#[format(R32_UINT)]
 	pub in_border_color: u32,
 	#[format(R32_UINT)]
-	pub round_border_gradient_srgb: [u8; 4],
+	pub round_border_gradient: [u8; 4],
 	#[format(R32_SFLOAT)]
 	pub depth: f32,
 }
@@ -103,11 +103,11 @@ impl RectRenderer {
 			in_color: cosmic_text::Color::from(rectangle.color).0,
 			in_color2: cosmic_text::Color::from(rectangle.color2).0,
 			in_border_color: cosmic_text::Color::from(rectangle.border_color).0,
-			round_border_gradient_srgb: [
+			round_border_gradient: [
 				(rectangle.round * 255.0) as u8,
 				(rectangle.border) as u8,
 				rectangle.gradient as u8,
-				0, //FIXME: srgb vs linear?
+				0, // unused
 			],
 			depth,
 		});

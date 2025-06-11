@@ -6,7 +6,7 @@ use crate::{
 use super::{
 	ContentType, FontSystem, GlyphDetails, GpuCacheStatus, SwashCache, TextArea,
 	custom_glyph::{CustomGlyphCacheKey, RasterizeCustomGlyphRequest, RasterizedCustomGlyph},
-	text_atlas::{ColorMode, GlyphVertex, TextAtlas, TextPipeline},
+	text_atlas::{GlyphVertex, TextAtlas, TextPipeline},
 };
 use cosmic_text::{Color, SubpixelBin, SwashContent};
 use glam::{Mat4, Vec2, Vec3};
@@ -273,13 +273,6 @@ impl TextRenderer {
 	}
 }
 
-#[repr(u16)]
-#[derive(Debug, Clone, Copy, Eq, PartialEq)]
-enum TextColorConversion {
-	None = 0,
-	ConvertToLinear = 1,
-}
-
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub(super) enum GlyphonCacheKey {
 	Text(cosmic_text::CacheKey),
@@ -481,12 +474,9 @@ fn prepare_glyph(
 		in_rect_dim: [glyph_width as u16, glyph_height as u16],
 		in_uv: [atlas_x, atlas_y],
 		in_color: par.color.0,
-		content_type_with_srgb: [
+		in_content_type: [
 			content_type as u16,
-			match par.atlas.color_mode {
-				ColorMode::Accurate => TextColorConversion::ConvertToLinear,
-				ColorMode::Web => TextColorConversion::None,
-			} as u16,
+			0, // unused (TODO!)
 		],
 		depth: par.depth,
 		scale: par.glyph_scale,
