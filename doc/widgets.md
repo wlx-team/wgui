@@ -98,6 +98,8 @@ Image widget, supports raster and svg vector
 
 #### Parameters
 
-`src`: image path
+`src`: Internal (assets) image path
+
+`src_ext`: External image path
 
 ---

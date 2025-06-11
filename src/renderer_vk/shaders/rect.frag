@@ -34,8 +34,10 @@ void main() {
 
   if (in_border_size < in_radius) {
     // rounded border
-    float f = smoothstep(in_border_size + pixel_size, in_border_size, -sdf) *
-              in_border_color.a;
+    float f = in_border_size > 0.0 ? smoothstep(in_border_size + pixel_size,
+                                                in_border_size, -sdf) *
+                                         in_border_color.a
+                                   : 0.0;
     out_color = mix(color, in_border_color, f);
   } else {
     // square border

@@ -29,6 +29,8 @@ use winit::{
 	keyboard::{KeyCode, PhysicalKey},
 };
 
+use crate::testbed::{testbed_dashboard::TestbedDashboard, testbed_generic::TestbedGeneric};
+
 mod assets;
 mod profiler;
 mod testbed;
@@ -49,6 +51,14 @@ fn init_logging() {
 				.from_env_lossy(),
 		)
 		.init();
+}
+
+fn load_testbed() -> anyhow::Result<Box<dyn Testbed>> {
+	let name = std::env::var("TESTBED").unwrap_or(String::new());
+	Ok(match name.as_str() {
+		"dashboard" => Box::new(TestbedDashboard::new()?),
+		_ => Box::new(TestbedGeneric::new()?),
+	})
 }
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -87,13 +97,15 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 	let mut recreate = false;
 	let mut last_draw = std::time::Instant::now();
 
-	let mut testbed = Testbed::new(window.scale_factor() as f32)?;
+	let mut scale = window.scale_factor() as f32;
+
+	let mut testbed = load_testbed()?;
+
 	let mut mouse = Vec2::ZERO;
 
-	let mut render_context =
-		renderer_vk::context::Context::new(gfx.clone(), native_format, testbed.scale)?;
+	let mut render_context = renderer_vk::context::Context::new(gfx.clone(), native_format, scale)?;
 
-	render_context.update_viewport(swapchain_size, testbed.scale)?;
+	render_context.update_viewport(swapchain_size, scale)?;
 	println!("new swapchain_size: {swapchain_size:?}");
 
 	let mut profiler = profiler::Profiler::new(100);
@@ -112,17 +124,17 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 				..
 			} => match delta {
 				MouseScrollDelta::LineDelta(x, y) => testbed
-					.layout
+					.layout()
 					.push_event(&wgui::event::Event::MouseWheel(MouseWheelEvent {
 						shift: Vec2::new(x, y),
-						pos: mouse / testbed.scale,
+						pos: mouse / scale,
 					}))
 					.unwrap(),
 				MouseScrollDelta::PixelDelta(pos) => testbed
-					.layout
+					.layout()
 					.push_event(&wgui::event::Event::MouseWheel(MouseWheelEvent {
 						shift: Vec2::new(pos.x as f32 / 5.0, pos.y as f32 / 5.0),
-						pos: mouse / testbed.scale,
+						pos: mouse / scale,
 					}))
 					.unwrap(),
 			},
@@ -133,16 +145,16 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 				if matches!(button, winit::event::MouseButton::Left) {
 					if matches!(state, winit::event::ElementState::Pressed) {
 						testbed
-							.layout
+							.layout()
 							.push_event(&wgui::event::Event::MouseDown(MouseDownEvent {
-								pos: mouse / testbed.scale,
+								pos: mouse / scale,
 							}))
 							.unwrap();
 					} else {
 						testbed
-							.layout
+							.layout()
 							.push_event(&wgui::event::Event::MouseUp(MouseUpEvent {
-								pos: mouse / testbed.scale,
+								pos: mouse / scale,
 							}))
 							.unwrap();
 					}
@@ -154,9 +166,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 			} => {
 				mouse = vec2(position.x as _, position.y as _);
 				testbed
-					.layout
+					.layout()
 					.push_event(&wgui::event::Event::MouseMotion(MouseMotionEvent {
-						pos: mouse / testbed.scale,
+						pos: mouse / scale,
 					}))
 					.unwrap();
 			}
@@ -166,16 +178,16 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 			} => {
 				if event.state == ElementState::Pressed {
 					if event.physical_key == PhysicalKey::Code(KeyCode::Equal) {
-						testbed.scale *= 1.25;
+						scale *= 1.25;
 						render_context
-							.update_viewport(swapchain_size, testbed.scale)
+							.update_viewport(swapchain_size, scale)
 							.unwrap();
 					}
 
 					if event.physical_key == PhysicalKey::Code(KeyCode::Minus) {
-						testbed.scale *= 0.75;
+						scale *= 0.75;
 						render_context
-							.update_viewport(swapchain_size, testbed.scale)
+							.update_viewport(swapchain_size, scale)
 							.unwrap();
 					}
 				}
@@ -214,7 +226,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 					};
 
 					render_context
-						.update_viewport(swapchain_size, testbed.scale)
+						.update_viewport(swapchain_size, scale)
 						.unwrap();
 
 					println!("new swapchain_size: {swapchain_size:?}");
@@ -223,18 +235,18 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 				}
 
 				while timestep.on_tick() {
-					testbed.layout.tick().unwrap();
+					testbed.layout().tick().unwrap();
 				}
 
 				testbed
 					.update(
-						(swapchain_size[0] as f32 / testbed.scale) as _,
-						(swapchain_size[1] as f32 / testbed.scale) as _,
+						(swapchain_size[0] as f32 / scale) as _,
+						(swapchain_size[1] as f32 / scale) as _,
 						timestep.alpha,
 					)
 					.unwrap();
 
-				if !render_context.dirty && !testbed.layout.check_toggle_needs_redraw() {
+				if !render_context.dirty && !testbed.layout().check_toggle_needs_redraw() {
 					// no need to redraw
 					std::thread::sleep(std::time::Duration::from_millis(5)); // dirty fix to prevent cpu burning precious cycles doing a busy loop
 					return;
@@ -265,7 +277,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 						.unwrap();
 					cmd_buf.begin_rendering(tgt).unwrap();
 
-					let primitives = wgui::drawing::draw(&testbed.layout).unwrap();
+					let primitives = wgui::drawing::draw(&testbed.layout()).unwrap();
 					render_context
 						.draw(&gfx, &mut cmd_buf, &primitives)
 						.unwrap();

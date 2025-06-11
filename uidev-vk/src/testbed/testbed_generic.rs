@@ -9,17 +9,16 @@ use wgui::{
 	renderer_vk::text::TextStyle,
 };
 
-use crate::assets;
+use crate::{assets, testbed::Testbed};
 
-pub struct Testbed {
+pub struct TestbedGeneric {
 	pub layout: Layout,
-	pub scale: f32,
 	rot: f32,
 	widget_id: Rc<RefCell<Option<WidgetID>>>,
 }
 
-impl Testbed {
-	pub fn new(scale: f32) -> anyhow::Result<Self> {
+impl TestbedGeneric {
+	pub fn new() -> anyhow::Result<Self> {
 		const XML_PATH: &str = "res/testbed.xml";
 
 		let mut layout = Layout::new(Box::new(assets::Asset {}))?;
@@ -75,13 +74,14 @@ impl Testbed {
 
 		Ok(Self {
 			layout,
-			scale,
 			rot: 0.0,
 			widget_id,
 		})
 	}
+}
 
-	pub fn update(&mut self, width: f32, height: f32, timestep_alpha: f32) -> anyhow::Result<()> {
+impl Testbed for TestbedGeneric {
+	fn update(&mut self, width: f32, height: f32, timestep_alpha: f32) -> anyhow::Result<()> {
 		if let Some(widget_id) = *self.widget_id.borrow() {
 			self.rot += 0.01;
 
@@ -99,5 +99,9 @@ impl Testbed {
 			.layout
 			.update(Vec2::new(width, height), timestep_alpha)?;
 		Ok(())
+	}
+
+	fn layout(&mut self) -> &mut Layout {
+		&mut self.layout
 	}
 }
