@@ -117,7 +117,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 						pos: mouse / testbed.scale,
 					}))
 					.unwrap(),
-				MouseScrollDelta::PixelDelta(_) => todo!(),
+				MouseScrollDelta::PixelDelta(pos) => testbed
+					.layout
+					.push_event(&wgui::event::Event::MouseWheel(MouseWheelEvent {
+						shift: Vec2::new(pos.x as f32 / 5.0, pos.y as f32 / 5.0),
+						pos: mouse / testbed.scale,
+					}))
+					.unwrap(),
 			},
 			Event::WindowEvent {
 				event: WindowEvent::MouseInput { state, button, .. },
