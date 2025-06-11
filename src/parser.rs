@@ -473,6 +473,15 @@ fn parse_widget_sprite<'a>(
 		#[allow(clippy::single_match)]
 		match key {
 			"src" => {
+				glyph = match CustomGlyphContent::from_assets(&mut ctx.layout.assets, value) {
+					Ok(glyph) => Some(glyph),
+					Err(e) => {
+						log::warn!("failed to load {}: {}", value, e);
+						None
+					}
+				}
+			}
+			"src_ext" => {
 				if std::fs::exists(value).unwrap_or(false) {
 					glyph = CustomGlyphContent::from_file(value).ok();
 				}

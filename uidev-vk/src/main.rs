@@ -29,6 +29,7 @@ use winit::{
 	keyboard::{KeyCode, PhysicalKey},
 };
 
+mod assets;
 mod profiler;
 mod testbed;
 mod timestep;
@@ -86,7 +87,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 	let mut recreate = false;
 	let mut last_draw = std::time::Instant::now();
 
-	let mut testbed = Testbed::new()?;
+	let mut testbed = Testbed::new(window.scale_factor() as f32)?;
 	let mut mouse = Vec2::ZERO;
 
 	let mut render_context =
@@ -239,7 +240,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 					return;
 				}
 
-				log::info!("drawing frame {}", frame_index);
+				log::trace!("drawing frame {}", frame_index);
 				frame_index += 1;
 
 				profiler.start();

@@ -5,6 +5,7 @@ use std::{
 
 use crate::{
 	animation::{self, Animations},
+	assets::AssetProvider,
 	event::{self, EventListener},
 	transform_stack::{Transform, TransformStack},
 	widget::{self, EventParams, WidgetState, div::Div},
@@ -26,6 +27,8 @@ struct PushEventState<'a> {
 
 pub struct Layout {
 	pub tree: TaffyTree<WidgetID>,
+
+	pub assets: Box<dyn AssetProvider>,
 
 	pub widget_states: WidgetMap,
 	pub widget_node_map: HashMap<WidgetID, taffy::NodeId>,
@@ -207,7 +210,7 @@ impl Layout {
 		Ok(())
 	}
 
-	pub fn new() -> anyhow::Result<Self> {
+	pub fn new(assets: Box<dyn AssetProvider>) -> anyhow::Result<Self> {
 		let mut tree = TaffyTree::new();
 		let mut widget_node_map = HashMap::new();
 		let mut widget_states = HopSlotMap::new();
@@ -233,6 +236,7 @@ impl Layout {
 			widget_states,
 			needs_redraw: true,
 			animations: Animations::new(),
+			assets,
 		})
 	}
 

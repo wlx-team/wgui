@@ -1,5 +1,6 @@
 pub mod animation;
 pub mod any;
+pub mod assets;
 pub mod components;
 pub mod drawing;
 pub mod event;

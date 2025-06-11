@@ -1,6 +1,6 @@
 use std::{cell::RefCell, rc::Rc};
 
-use glam::{Mat4, Vec3};
+use glam::Mat4;
 use wgui::{
 	drawing::{self},
 	event::EventListener,
@@ -8,6 +8,8 @@ use wgui::{
 	layout::{Layout, WidgetID},
 	renderer_vk::text::TextStyle,
 };
+
+use crate::assets;
 
 pub struct Testbed {
 	pub layout: Layout,
@@ -17,10 +19,10 @@ pub struct Testbed {
 }
 
 impl Testbed {
-	pub fn new() -> anyhow::Result<Self> {
+	pub fn new(scale: f32) -> anyhow::Result<Self> {
 		const XML_PATH: &str = "res/testbed.xml";
 
-		let mut layout = Layout::new()?;
+		let mut layout = Layout::new(Box::new(assets::Asset {}))?;
 
 		let parent = layout.root_widget;
 
@@ -33,8 +35,8 @@ impl Testbed {
 		use wgui::components::button;
 		let my_div_parent = res.require_by_id("my_div_parent")?;
 		// create some buttons for testing
-		for i in 0..10 {
-			let n = i as f32 / 10.0;
+		for i in 0..4 {
+			let n = i as f32 / 4.0;
 			button::construct(
 				&mut layout,
 				my_div_parent,
@@ -73,7 +75,7 @@ impl Testbed {
 
 		Ok(Self {
 			layout,
-			scale: 1.5,
+			scale,
 			rot: 0.0,
 			widget_id,
 		})

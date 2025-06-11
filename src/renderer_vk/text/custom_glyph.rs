@@ -7,8 +7,10 @@ use std::{
 };
 
 use cosmic_text::SubpixelBin;
-use image::{ImageReader, RgbaImage};
+use image::RgbaImage;
 use resvg::usvg::{Options, Tree};
+
+use crate::assets::AssetProvider;
 
 static AUTO_INCREMENT: AtomicUsize = AtomicUsize::new(0);
 
@@ -19,14 +21,31 @@ pub enum CustomGlyphContent {
 }
 
 impl CustomGlyphContent {
-	pub fn from_file(path: &str) -> anyhow::Result<Self> {
+	pub fn from_bin_svg(data: &[u8]) -> anyhow::Result<Self> {
+		let tree = Tree::from_data(data, &Options::default())?;
+		Ok(CustomGlyphContent::Svg(tree))
+	}
+
+	pub fn from_bin_raster(data: &[u8]) -> anyhow::Result<Self> {
+		let image = image::load_from_memory(data)?.into_rgba8();
+		Ok(CustomGlyphContent::Image(image))
+	}
+
+	pub fn from_assets(provider: &mut Box<dyn AssetProvider>, path: &str) -> anyhow::Result<Self> {
+		let data = provider.load_from_path(path)?;
 		if path.ends_with(".svg") || path.ends_with(".svgz") {
-			let data = std::fs::read(path)?;
-			let tree = Tree::from_data(&data, &Options::default())?;
-			Ok(CustomGlyphContent::Svg(tree))
+			Ok(CustomGlyphContent::from_bin_svg(&data)?)
 		} else {
-			let image = ImageReader::open(path)?.decode()?.into_rgba8();
-			Ok(CustomGlyphContent::Image(image))
+			Ok(CustomGlyphContent::from_bin_raster(&data)?)
+		}
+	}
+
+	pub fn from_file(path: &str) -> anyhow::Result<Self> {
+		let data = std::fs::read(path)?;
+		if path.ends_with(".svg") || path.ends_with(".svgz") {
+			Ok(CustomGlyphContent::from_bin_svg(&data)?)
+		} else {
+			Ok(CustomGlyphContent::from_bin_raster(&data)?)
 		}
 	}
 }
