@@ -631,7 +631,21 @@ fn parse_children<'a>(
 	Ok(())
 }
 
-pub fn parse(layout: &mut Layout, parent_id: WidgetID, xml: &str) -> anyhow::Result<ParserResult> {
+pub fn parse_from_assets(
+	layout: &mut Layout,
+	parent_id: WidgetID,
+	path: &str,
+) -> anyhow::Result<ParserResult> {
+	let data = layout.assets.load_from_path(path)?;
+	let data = std::str::from_utf8(&data)?;
+	parse_str(layout, parent_id, data)
+}
+
+pub fn parse_str(
+	layout: &mut Layout,
+	parent_id: WidgetID,
+	xml: &str,
+) -> anyhow::Result<ParserResult> {
 	let mut result = ParserResult::default();
 
 	let mut ctx = ParserContext {

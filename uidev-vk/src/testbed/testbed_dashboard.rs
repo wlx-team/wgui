@@ -8,17 +8,13 @@ pub struct TestbedDashboard {
 
 impl TestbedDashboard {
 	pub fn new() -> anyhow::Result<Self> {
-		const XML_PATH: &str = "res/dashboard.xml";
+		const XML_PATH: &str = "gui/dashboard.xml";
 
 		let mut layout = Layout::new(Box::new(assets::Asset {}))?;
 
 		let parent = layout.root_widget;
 
-		let res = wgui::parser::parse(
-			&mut layout,
-			parent,
-			std::fs::read_to_string(XML_PATH).unwrap().as_str(),
-		)?;
+		let _res = wgui::parser::parse_from_assets(&mut layout, parent, XML_PATH)?;
 
 		Ok(Self { layout })
 	}
