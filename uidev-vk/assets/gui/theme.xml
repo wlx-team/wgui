@@ -1,0 +1,8 @@
+<layout>
+  <theme>
+    <color name="menu_dark" color="#0A0A0ACC" />
+    <color name="background_dark" color="#0d131acc" />
+    <color name="background_light" color="#244179aa" />
+    <color name="bottom_panel" color="#141e28" />
+  </theme>
+</layout>

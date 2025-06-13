@@ -1,4 +1,6 @@
 <layout>
+  <include src="theme.xml" />
+
   <elements>
     <!-- background for testing -->
     <rectangle position="absolute" color="#333333" width="100%" height="100%" />
@@ -10,7 +12,7 @@
         <rectangle
           width="100%"
           round="100%"
-          color="#0A0A0ACC"
+          color="~menu_dark"
           flex_direction="column"
           justify_content="center"
           align_items="center"
@@ -83,7 +85,7 @@
           flex_direction="row"
           align_items="center"
           justify_content="space_between"
-          color="#141e28"
+          color="~bottom_panel"
         >
           <!-- left gradient -->
           <div position="absolute" width="100%" height="100%" justify_content="start">
