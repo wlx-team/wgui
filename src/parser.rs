@@ -1,4 +1,7 @@
-use std::collections::HashMap;
+use std::{
+	collections::HashMap,
+	path::{Path, PathBuf},
+};
 
 use taffy::{
 	AlignContent, AlignItems, AlignSelf, BoxSizing, Display, FlexDirection, FlexWrap, JustifyContent,
@@ -33,11 +36,20 @@ impl ParserResult {
 			None => anyhow::bail!("Widget by ID \"{}\" doesn't exist", id),
 		}
 	}
+
+	pub fn take_result(&mut self, result: ParserResult) {
+		for (k, v) in result.ids {
+			if self.ids.insert(k.clone(), v).is_some() {
+				log::warn!("Duplicated widget ID \"{k}\" detected");
+			}
+		}
+	}
 }
 
 struct ParserContext<'a> {
 	layout: &'a mut Layout,
 	result: &'a mut ParserResult,
+	path: &'a mut PathBuf,
 }
 
 // Parses a color from a HTML hex string
@@ -403,7 +415,6 @@ fn parse_widget_rectangle<'a>(
 	for attrib in node.attributes() {
 		let (key, value) = (attrib.name(), attrib.value());
 
-		#[allow(clippy::single_match)]
 		match key {
 			"color" => {
 				if let Some(color) = parse_color(value) {
@@ -483,7 +494,6 @@ fn parse_widget_sprite<'a>(
 	for attrib in node.attributes() {
 		let (key, value) = (attrib.name(), attrib.value());
 
-		#[allow(clippy::single_match)]
 		match key {
 			"src" => {
 				glyph = match CustomGlyphContent::from_assets(&mut ctx.layout.assets, value) {
@@ -530,7 +540,6 @@ fn parse_widget_label<'a>(
 	for attrib in node.attributes() {
 		let (key, value) = (attrib.name(), attrib.value());
 
-		#[allow(clippy::single_match)]
 		match key {
 			"text" => {
 				params.content = String::from(value);
@@ -579,6 +588,32 @@ fn parse_widget_label<'a>(
 	Ok(())
 }
 
+fn parse_tag_include<'a>(
+	ctx: &mut ParserContext,
+	node: roxmltree::Node<'a, 'a>,
+	parent_id: WidgetID,
+) -> anyhow::Result<()> {
+	for attrib in node.attributes() {
+		let (key, value) = (attrib.name(), attrib.value());
+
+		#[allow(clippy::single_match)]
+		match key {
+			"src" => {
+				let mut new_path = ctx.path.parent().unwrap_or(Path::new("/")).to_path_buf();
+				new_path.push(value);
+
+				let result = parse_from_assets(ctx.layout, parent_id, &new_path.to_string_lossy())?;
+				ctx.result.take_result(result);
+			}
+			_ => {
+				print_invalid_attrib(key, value);
+			}
+		}
+	}
+
+	Ok(())
+}
+
 fn parse_universal<'a>(
 	ctx: &mut ParserContext,
 	node: roxmltree::Node<'a, 'a>,
@@ -613,6 +648,9 @@ fn parse_children<'a>(
 ) -> anyhow::Result<()> {
 	for child_node in node.children() {
 		match child_node.tag_name().name() {
+			"include" => {
+				parse_tag_include(ctx, child_node, parent_id)?;
+			}
 			"div" => {
 				parse_widget_div(ctx, child_node, parent_id)?;
 			}
@@ -638,12 +676,14 @@ pub fn parse_from_assets(
 ) -> anyhow::Result<ParserResult> {
 	let data = layout.assets.load_from_path(path)?;
 	let data = std::str::from_utf8(&data)?;
-	parse_str(layout, parent_id, data)
+	let path = PathBuf::from(path);
+	parse_str(layout, parent_id, path, data)
 }
 
 pub fn parse_str(
 	layout: &mut Layout,
 	parent_id: WidgetID,
+	mut path: PathBuf,
 	xml: &str,
 ) -> anyhow::Result<ParserResult> {
 	let mut result = ParserResult::default();
@@ -651,6 +691,7 @@ pub fn parse_str(
 	let mut ctx = ParserContext {
 		layout,
 		result: &mut result,
+		path: &mut path,
 	};
 
 	let opt = roxmltree::ParsingOptions {
