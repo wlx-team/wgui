@@ -1,8 +1,8 @@
 <layout>
   <theme>
-    <color name="aqua1" color="#00AAFF" />
-    <color name="aqua2" color="#00CCFF" />
-    <color name="aqua3" color="#00FFFF" />
+    <var key="aqua1" value="#00AAFF" />
+    <var key="aqua2" value="#00CCFF" />
+    <var key="aqua3" value="#00FFFF" />
   </theme>
 
   <elements>

@@ -1,6 +1,7 @@
 use std::{
 	collections::HashMap,
 	path::{Path, PathBuf},
+	rc::Rc,
 };
 
 use taffy::{
@@ -24,10 +25,12 @@ use crate::{
 	},
 };
 
+type VarMap = HashMap<Rc<str>, Rc<str>>;
+
 #[derive(Default)]
 pub struct ParserState {
-	pub ids: HashMap<String, WidgetID>,
-	pub colors: HashMap<String, drawing::Color>,
+	pub ids: HashMap<Rc<str>, WidgetID>,
+	pub var_map: VarMap,
 }
 
 impl ParserState {
@@ -83,15 +86,6 @@ fn parse_color_hex(html_hex: &str) -> Option<drawing::Color> {
 	None
 }
 
-#[allow(clippy::manual_strip)]
-fn parse_color(state: &ParserState, value: &str) -> Option<drawing::Color> {
-	if value.starts_with("~") {
-		let color_name = &value[1..];
-		return state.colors.get(color_name).cloned();
-	}
-	parse_color_hex(value)
-}
-
 fn get_tag_by_name<'a>(
 	node: roxmltree::Node<'a, 'a>,
 	name: &str,
@@ -120,7 +114,7 @@ fn print_invalid_value(value: &str) {
 	log::warn!("Invalid value \"{}\"", value);
 }
 
-fn parse_val(value: &str) -> Option<f32> {
+fn parse_val(value: &Rc<str>) -> Option<f32> {
 	let Ok(val) = value.parse::<f32>() else {
 		print_invalid_value(value);
 		return None;
@@ -160,65 +154,63 @@ where
 	}
 }
 
-fn style_from_node<'a>(node: roxmltree::Node<'a, 'a>) -> taffy::Style {
+fn style_from_node<'a>(file: &mut ParserFile, node: roxmltree::Node<'a, 'a>) -> taffy::Style {
 	let mut style = taffy::Style {
 		..Default::default()
 	};
 
-	for attrib in node.attributes() {
-		let (key, value) = (attrib.name(), attrib.value());
-
-		match key {
-			"display" => match value {
+	for (key, value) in iter_attribs(&mut file.ctx.state.var_map, &node) {
+		match &*key {
+			"display" => match &*value {
 				"flex" => style.display = Display::Flex,
 				"block" => style.display = Display::Block,
 				"grid" => style.display = Display::Grid,
 				_ => {
-					print_invalid_attrib(key, value);
+					print_invalid_attrib(&key, &value);
 				}
 			},
 			"margin_left" => {
-				if let Some(dim) = parse_size_unit(value) {
+				if let Some(dim) = parse_size_unit(&value) {
 					style.margin.left = dim;
 				}
 			}
 			"margin_right" => {
-				if let Some(dim) = parse_size_unit(value) {
+				if let Some(dim) = parse_size_unit(&value) {
 					style.margin.right = dim;
 				}
 			}
 			"margin_top" => {
-				if let Some(dim) = parse_size_unit(value) {
+				if let Some(dim) = parse_size_unit(&value) {
 					style.margin.top = dim;
 				}
 			}
 			"margin_bottom" => {
-				if let Some(dim) = parse_size_unit(value) {
+				if let Some(dim) = parse_size_unit(&value) {
 					style.margin.bottom = dim;
 				}
 			}
 			"padding_left" => {
-				if let Some(dim) = parse_size_unit(value) {
+				if let Some(dim) = parse_size_unit(&value) {
 					style.padding.left = dim;
 				}
 			}
 			"padding_right" => {
-				if let Some(dim) = parse_size_unit(value) {
+				if let Some(dim) = parse_size_unit(&value) {
 					style.padding.right = dim;
 				}
 			}
 			"padding_top" => {
-				if let Some(dim) = parse_size_unit(value) {
+				if let Some(dim) = parse_size_unit(&value) {
 					style.padding.top = dim;
 				}
 			}
 			"padding_bottom" => {
-				if let Some(dim) = parse_size_unit(value) {
+				if let Some(dim) = parse_size_unit(&value) {
 					style.padding.bottom = dim;
 				}
 			}
 			"margin" => {
-				if let Some(dim) = parse_size_unit(value) {
+				if let Some(dim) = parse_size_unit(&value) {
 					style.margin.left = dim;
 					style.margin.right = dim;
 					style.margin.top = dim;
@@ -226,96 +218,96 @@ fn style_from_node<'a>(node: roxmltree::Node<'a, 'a>) -> taffy::Style {
 				}
 			}
 			"padding" => {
-				if let Some(dim) = parse_size_unit(value) {
+				if let Some(dim) = parse_size_unit(&value) {
 					style.padding.left = dim;
 					style.padding.right = dim;
 					style.padding.top = dim;
 					style.padding.bottom = dim;
 				}
 			}
-			"overflow_x" => match value {
+			"overflow_x" => match &*value {
 				"hidden" => style.overflow.x = Overflow::Hidden,
 				"visible" => style.overflow.x = Overflow::Visible,
 				"clip" => style.overflow.x = Overflow::Clip,
 				"scroll" => style.overflow.x = Overflow::Scroll,
 				_ => {
-					print_invalid_attrib(key, value);
+					print_invalid_attrib(&key, &value);
 				}
 			},
-			"overflow_y" => match value {
+			"overflow_y" => match &*value {
 				"hidden" => style.overflow.y = Overflow::Hidden,
 				"visible" => style.overflow.y = Overflow::Visible,
 				"clip" => style.overflow.y = Overflow::Clip,
 				"scroll" => style.overflow.y = Overflow::Scroll,
 				_ => {
-					print_invalid_attrib(key, value);
+					print_invalid_attrib(&key, &value);
 				}
 			},
 			"min_width" => {
-				if let Some(dim) = parse_size_unit(value) {
+				if let Some(dim) = parse_size_unit(&value) {
 					style.min_size.width = dim;
 				}
 			}
 			"min_height" => {
-				if let Some(dim) = parse_size_unit(value) {
+				if let Some(dim) = parse_size_unit(&value) {
 					style.min_size.height = dim;
 				}
 			}
 			"max_width" => {
-				if let Some(dim) = parse_size_unit(value) {
+				if let Some(dim) = parse_size_unit(&value) {
 					style.max_size.width = dim;
 				}
 			}
 			"max_height" => {
-				if let Some(dim) = parse_size_unit(value) {
+				if let Some(dim) = parse_size_unit(&value) {
 					style.max_size.height = dim;
 				}
 			}
 			"width" => {
-				if let Some(dim) = parse_size_unit(value) {
+				if let Some(dim) = parse_size_unit(&value) {
 					style.size.width = dim;
 				}
 			}
 			"height" => {
-				if let Some(dim) = parse_size_unit(value) {
+				if let Some(dim) = parse_size_unit(&value) {
 					style.size.height = dim;
 				}
 			}
 			"gap" => {
-				if let Some(val) = parse_size_unit(value) {
+				if let Some(val) = parse_size_unit(&value) {
 					style.gap = val;
 				}
 			}
 			"flex_basis" => {
-				if let Some(val) = parse_size_unit(value) {
+				if let Some(val) = parse_size_unit(&value) {
 					style.flex_basis = val;
 				}
 			}
 			"flex_grow" => {
-				if let Some(val) = parse_val(value) {
+				if let Some(val) = parse_val(&value) {
 					style.flex_grow = val;
 				}
 			}
 			"flex_shrink" => {
-				if let Some(val) = parse_val(value) {
+				if let Some(val) = parse_val(&value) {
 					style.flex_shrink = val;
 				}
 			}
-			"position" => match value {
+			"position" => match &*value {
 				"absolute" => style.position = taffy::Position::Absolute,
 				"relative" => style.position = taffy::Position::Relative,
 				_ => {
-					print_invalid_attrib(key, value);
+					print_invalid_attrib(&key, &value);
 				}
 			},
-			"box_sizing" => match value {
+			"box_sizing" => match &*value {
 				"border_box" => style.box_sizing = BoxSizing::BorderBox,
 				"content_box" => style.box_sizing = BoxSizing::ContentBox,
 				_ => {
-					print_invalid_attrib(key, value);
+					print_invalid_attrib(&key, &value);
 				}
 			},
-			"align_self" => match value {
+			"align_self" => match &*value {
 				"baseline" => style.align_self = Some(AlignSelf::Baseline),
 				"center" => style.align_self = Some(AlignSelf::Center),
 				"end" => style.align_self = Some(AlignSelf::End),
@@ -324,10 +316,10 @@ fn style_from_node<'a>(node: roxmltree::Node<'a, 'a>) -> taffy::Style {
 				"start" => style.align_self = Some(AlignSelf::Start),
 				"stretch" => style.align_self = Some(AlignSelf::Stretch),
 				_ => {
-					print_invalid_attrib(key, value);
+					print_invalid_attrib(&key, &value);
 				}
 			},
-			"justify_self" => match value {
+			"justify_self" => match &*value {
 				"center" => style.justify_self = Some(JustifySelf::Center),
 				"end" => style.justify_self = Some(JustifySelf::End),
 				"flex_end" => style.justify_self = Some(JustifySelf::FlexEnd),
@@ -335,10 +327,10 @@ fn style_from_node<'a>(node: roxmltree::Node<'a, 'a>) -> taffy::Style {
 				"start" => style.justify_self = Some(JustifySelf::Start),
 				"stretch" => style.justify_self = Some(JustifySelf::Stretch),
 				_ => {
-					print_invalid_attrib(key, value);
+					print_invalid_attrib(&key, &value);
 				}
 			},
-			"align_items" => match value {
+			"align_items" => match &*value {
 				"baseline" => style.align_items = Some(AlignItems::Baseline),
 				"center" => style.align_items = Some(AlignItems::Center),
 				"end" => style.align_items = Some(AlignItems::End),
@@ -347,10 +339,10 @@ fn style_from_node<'a>(node: roxmltree::Node<'a, 'a>) -> taffy::Style {
 				"start" => style.align_items = Some(AlignItems::Start),
 				"stretch" => style.align_items = Some(AlignItems::Stretch),
 				_ => {
-					print_invalid_attrib(key, value);
+					print_invalid_attrib(&key, &value);
 				}
 			},
-			"align_content" => match value {
+			"align_content" => match &*value {
 				"center" => style.align_content = Some(AlignContent::Center),
 				"end" => style.align_content = Some(AlignContent::End),
 				"flex_end" => style.align_content = Some(AlignContent::FlexEnd),
@@ -361,10 +353,10 @@ fn style_from_node<'a>(node: roxmltree::Node<'a, 'a>) -> taffy::Style {
 				"start" => style.align_content = Some(AlignContent::Start),
 				"stretch" => style.align_content = Some(AlignContent::Stretch),
 				_ => {
-					print_invalid_attrib(key, value);
+					print_invalid_attrib(&key, &value);
 				}
 			},
-			"justify_content" => match value {
+			"justify_content" => match &*value {
 				"center" => style.justify_content = Some(JustifyContent::Center),
 				"end" => style.justify_content = Some(JustifyContent::End),
 				"flex_end" => style.justify_content = Some(JustifyContent::FlexEnd),
@@ -375,22 +367,22 @@ fn style_from_node<'a>(node: roxmltree::Node<'a, 'a>) -> taffy::Style {
 				"start" => style.justify_content = Some(JustifyContent::Start),
 				"stretch" => style.justify_content = Some(JustifyContent::Stretch),
 				_ => {
-					print_invalid_attrib(key, value);
+					print_invalid_attrib(&key, &value);
 				}
 			},
-			"flex_wrap" => match value {
+			"flex_wrap" => match &*value {
 				"wrap" => style.flex_wrap = FlexWrap::Wrap,
 				"no_wrap" => style.flex_wrap = FlexWrap::NoWrap,
 				"wrap_reverse" => style.flex_wrap = FlexWrap::WrapReverse,
 				_ => {}
 			},
-			"flex_direction" => match value {
+			"flex_direction" => match &*value {
 				"column_reverse" => style.flex_direction = FlexDirection::ColumnReverse,
 				"column" => style.flex_direction = FlexDirection::Column,
 				"row_reverse" => style.flex_direction = FlexDirection::RowReverse,
 				"row" => style.flex_direction = FlexDirection::Row,
 				_ => {
-					print_invalid_attrib(key, value);
+					print_invalid_attrib(&key, &value);
 				}
 			},
 			_ => {}
@@ -405,10 +397,12 @@ fn parse_widget_div<'a>(
 	node: roxmltree::Node<'a, 'a>,
 	parent_id: WidgetID,
 ) -> anyhow::Result<()> {
+	let style = style_from_node(file, node);
+
 	let (new_id, _) = file
 		.ctx
 		.layout
-		.add_child(parent_id, Div::create()?, style_from_node(node))?;
+		.add_child(parent_id, Div::create()?, style)?;
 
 	parse_universal(file, node, new_id)?;
 	parse_children(file, node, new_id)?;
@@ -423,71 +417,70 @@ fn parse_widget_rectangle<'a>(
 ) -> anyhow::Result<()> {
 	let mut params = RectangleParams::default();
 
-	for attrib in node.attributes() {
-		let (key, value) = (attrib.name(), attrib.value());
-
-		match key {
+	for (key, value) in iter_attribs(&mut file.ctx.state.var_map, &node) {
+		match &*key {
 			"color" => {
-				if let Some(color) = parse_color(file.ctx.state, value) {
+				if let Some(color) = parse_color_hex(&value) {
 					params.color = color;
 				} else {
-					print_invalid_attrib(key, value);
+					print_invalid_attrib(&key, &value);
 				}
 			}
 			"color2" => {
-				if let Some(color) = parse_color(file.ctx.state, value) {
+				if let Some(color) = parse_color_hex(&value) {
 					params.color2 = color;
 				} else {
-					print_invalid_attrib(key, value);
+					print_invalid_attrib(&key, &value);
 				}
 			}
 			"gradient" => {
-				params.gradient = match value {
+				params.gradient = match &*value {
 					"horizontal" => GradientMode::Horizontal,
 					"vertical" => GradientMode::Vertical,
 					"radial" => GradientMode::Radial,
 					"none" => GradientMode::None,
 					_ => {
-						print_invalid_attrib(key, value);
+						print_invalid_attrib(&key, &value);
 						GradientMode::None
 					}
 				}
 			}
 			"round" => {
-				if is_percent(value) {
-					if let Some(val) = parse_percent(value) {
+				if is_percent(&value) {
+					if let Some(val) = parse_percent(&value) {
 						params.round = WLength::Percent(val);
 					} else {
-						print_invalid_value(value);
+						print_invalid_value(&value);
 					}
-				} else if let Some(val) = parse_f32(value) {
+				} else if let Some(val) = parse_f32(&value) {
 					params.round = WLength::Units(val);
 				} else {
-					print_invalid_value(value);
+					print_invalid_value(&value);
 				}
 			}
 			"border" => {
 				params.border = value.parse().unwrap_or_else(|_| {
-					print_invalid_attrib(key, value);
+					print_invalid_attrib(&key, &value);
 					0.0
 				});
 			}
 			"border_color" => {
-				if let Some(color) = parse_color(file.ctx.state, value) {
+				if let Some(color) = parse_color_hex(&value) {
 					params.border_color = color;
 				} else {
-					print_invalid_attrib(key, value);
+					print_invalid_attrib(&key, &value);
 				}
 			}
 			_ => {}
 		}
 	}
 
-	let (new_id, _) =
-		file
-			.ctx
-			.layout
-			.add_child(parent_id, Rectangle::create(params)?, style_from_node(node))?;
+	let style = style_from_node(file, node);
+
+	let (new_id, _) = file
+		.ctx
+		.layout
+		.add_child(parent_id, Rectangle::create(params)?, style)?;
 
 	parse_universal(file, node, new_id)?;
 	parse_children(file, node, new_id)?;
@@ -503,12 +496,10 @@ fn parse_widget_sprite<'a>(
 	let mut params = SpriteBoxParams::default();
 
 	let mut glyph = None;
-	for attrib in node.attributes() {
-		let (key, value) = (attrib.name(), attrib.value());
-
-		match key {
+	for (key, value) in iter_attribs(&mut file.ctx.state.var_map, &node) {
+		match &*key {
 			"src" => {
-				glyph = match CustomGlyphContent::from_assets(&mut file.ctx.layout.assets, value) {
+				glyph = match CustomGlyphContent::from_assets(&mut file.ctx.layout.assets, &value) {
 					Ok(glyph) => Some(glyph),
 					Err(e) => {
 						log::warn!("failed to load {}: {}", value, e);
@@ -517,8 +508,8 @@ fn parse_widget_sprite<'a>(
 				}
 			}
 			"src_ext" => {
-				if std::fs::exists(value).unwrap_or(false) {
-					glyph = CustomGlyphContent::from_file(value).ok();
+				if std::fs::exists(value.as_ref()).unwrap_or(false) {
+					glyph = CustomGlyphContent::from_file(&value).ok();
 				}
 			}
 			_ => {}
@@ -531,11 +522,12 @@ fn parse_widget_sprite<'a>(
 		log::warn!("No source for sprite node!");
 	};
 
-	let (new_id, _) =
-		file
-			.ctx
-			.layout
-			.add_child(parent_id, SpriteBox::create(params)?, style_from_node(node))?;
+	let style = style_from_node(file, node);
+
+	let (new_id, _) = file
+		.ctx
+		.layout
+		.add_child(parent_id, SpriteBox::create(params)?, style)?;
 
 	parse_universal(file, node, new_id)?;
 	parse_children(file, node, new_id)?;
@@ -550,51 +542,50 @@ fn parse_widget_label<'a>(
 ) -> anyhow::Result<()> {
 	let mut params = TextParams::default();
 
-	for attrib in node.attributes() {
-		let (key, value) = (attrib.name(), attrib.value());
-
-		match key {
+	for (key, value) in iter_attribs(&mut file.ctx.state.var_map, &node) {
+		match &*key {
 			"text" => {
-				params.content = String::from(value);
+				params.content = String::from(value.as_ref());
 			}
 			"color" => {
-				if let Some(color) = parse_color(file.ctx.state, value) {
+				if let Some(color) = parse_color_hex(&value) {
 					params.style.color = Some(color);
 				}
 			}
-			"align" => match value {
+			"align" => match &*value {
 				"left" => params.style.align = Some(HorizontalAlign::Left),
 				"right" => params.style.align = Some(HorizontalAlign::Right),
 				"center" => params.style.align = Some(HorizontalAlign::Center),
 				"justified" => params.style.align = Some(HorizontalAlign::Justified),
 				"end" => params.style.align = Some(HorizontalAlign::End),
 				_ => {
-					print_invalid_attrib(key, value);
+					print_invalid_attrib(&key, &value);
 				}
 			},
-			"weight" => match value {
+			"weight" => match &*value {
 				"normal" => params.style.weight = Some(FontWeight::Normal),
 				"bold" => params.style.weight = Some(FontWeight::Bold),
 				_ => {
-					print_invalid_attrib(key, value);
+					print_invalid_attrib(&key, &value);
 				}
 			},
 			"size" => {
 				if let Ok(size) = value.parse::<f32>() {
 					params.style.size = Some(size);
 				} else {
-					print_invalid_attrib(key, value);
+					print_invalid_attrib(&key, &value);
 				}
 			}
 			_ => {}
 		}
 	}
 
-	let (new_id, _) =
-		file
-			.ctx
-			.layout
-			.add_child(parent_id, TextLabel::create(params)?, style_from_node(node))?;
+	let style = style_from_node(file, node);
+
+	let (new_id, _) = file
+		.ctx
+		.layout
+		.add_child(parent_id, TextLabel::create(params)?, style)?;
 
 	parse_universal(file, node, new_id)?;
 	parse_children(file, node, new_id)?;
@@ -627,45 +618,75 @@ fn parse_tag_include<'a>(
 	Ok(())
 }
 
-fn parse_tag_color<'a>(file: &mut ParserFile, node: roxmltree::Node<'a, 'a>) -> anyhow::Result<()> {
-	let mut name: Option<&str> = None;
-	let mut color: Option<drawing::Color> = None;
+fn parse_tag_var<'a>(file: &mut ParserFile, node: roxmltree::Node<'a, 'a>) -> anyhow::Result<()> {
+	let mut out_key: Option<&str> = None;
+	let mut out_value: Option<&str> = None;
 
 	for attrib in node.attributes() {
 		let (key, value) = (attrib.name(), attrib.value());
 
 		match key {
-			"name" => {
-				name = Some(value);
+			"key" => {
+				out_key = Some(value);
 			}
-			"color" => color = parse_color(file.ctx.state, value),
+			"value" => {
+				out_value = Some(value);
+			}
 			_ => {
 				print_invalid_attrib(key, value);
 			}
 		}
 	}
 
-	let Some(color) = color else {
-		print_missing_attrib("color", "color");
+	let Some(key) = out_key else {
+		print_missing_attrib("var", "key");
 		return Ok(());
 	};
 
-	let Some(name) = name else {
-		print_missing_attrib("color", "name");
+	let Some(value) = out_value else {
+		print_missing_attrib("var", "value");
 		return Ok(());
 	};
 
-	file.ctx.state.colors.insert(String::from(name), color);
+	file
+		.ctx
+		.state
+		.var_map
+		.insert(Rc::from(key), Rc::from(value));
 
 	Ok(())
+}
+
+#[allow(clippy::manual_strip)]
+pub fn iter_attribs<'a>(
+	var_map: &'a mut VarMap,
+	node: &roxmltree::Node<'a, 'a>,
+) -> impl Iterator<Item = (/*key*/ Rc<str>, /*value*/ Rc<str>)> + 'a {
+	node.attributes().map(|attrib| {
+		let (key, value) = (attrib.name(), attrib.value());
+
+		if value.starts_with("~") {
+			let name = &value[1..];
+
+			return (
+				Rc::from(key),
+				match var_map.get(name) {
+					Some(name) => name.clone(),
+					None => Rc::from("undefined"),
+				},
+			);
+		}
+
+		(Rc::from(key), Rc::from(value))
+	})
 }
 
 fn parse_tag_theme<'a>(file: &mut ParserFile, node: roxmltree::Node<'a, 'a>) -> anyhow::Result<()> {
 	for child_node in node.children() {
 		let child_name = child_node.tag_name().name();
 		match child_name {
-			"color" => {
-				parse_tag_color(file, child_node)?;
+			"var" => {
+				parse_tag_var(file, child_node)?;
 			}
 			_ => {
 				print_invalid_value(child_name);
@@ -681,18 +702,16 @@ fn parse_universal<'a>(
 	node: roxmltree::Node<'a, 'a>,
 	widget_id: WidgetID,
 ) -> anyhow::Result<()> {
-	for attrib in node.attributes() {
-		let (key, value) = (attrib.name(), attrib.value());
-
+	for (key, value) in iter_attribs(&mut file.ctx.state.var_map, &node) {
 		#[allow(clippy::single_match)]
-		match key {
+		match &*key {
 			"id" => {
 				// Attach a specific widget to name-ID map (just like getElementById)
 				if file
 					.ctx
 					.state
 					.ids
-					.insert(String::from(value), widget_id)
+					.insert(value.clone(), widget_id)
 					.is_some()
 				{
 					log::warn!("duplicate ID \"{}\" in the same layout file!", value);
@@ -784,12 +803,9 @@ fn parse_str(file: &mut ParserFile, parent_id: WidgetID, xml: &str) -> anyhow::R
 		match child.tag_name().name() {
 			/*  topmost include directly in <layout>  */
 			"include" => parse_tag_include(file, child, parent_id)?,
+			"theme" => parse_tag_theme(file, child)?,
 			_ => {}
 		}
-	}
-
-	if let Some(tag_theme) = get_tag_by_name(tag_layout, "theme") {
-		parse_tag_theme(file, tag_theme)?;
 	}
 
 	if let Some(tag_elements) = get_tag_by_name(tag_layout, "elements") {
