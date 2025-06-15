@@ -1,5 +1,6 @@
 use std::sync::{Arc, OnceLock};
 use wgui::gfx::WGfx;
+use wgui::vulkano::swapchain::SurfaceInfo;
 use wgui::vulkano::{
 	self,
 	device::{
@@ -14,6 +15,7 @@ fn get_vulkan_library() -> &'static Arc<vulkano::VulkanLibrary> {
 	VULKAN_LIBRARY.get_or_init(|| vulkano::VulkanLibrary::new().unwrap()) // want panic
 }
 
+#[allow(clippy::type_complexity)]
 pub fn init_window() -> anyhow::Result<(
 	Arc<WGfx>,
 	winit::event_loop::EventLoop<()>,
@@ -84,6 +86,12 @@ pub fn init_window() -> anyhow::Result<(
 		log::info!("img_filter_cubic!");
 	}
 
+	let surface_format = physical_device
+		.surface_formats(&surface, SurfaceInfo::default())
+		.unwrap()[0] // want panic
+		.0;
+	log::info!("Using surface format: {surface_format:?}");
+
 	let (device, queues) = Device::new(
 		physical_device,
 		DeviceCreateInfo {
@@ -106,7 +114,7 @@ pub fn init_window() -> anyhow::Result<(
 
 	let (queue_gfx, queue_xfer, _) = unwrap_queues(queues.collect());
 
-	let me = WGfx::new_from_raw(instance, device, queue_gfx, queue_xfer, None);
+	let me = WGfx::new_from_raw(instance, device, queue_gfx, queue_xfer, surface_format);
 	Ok((me, event_loop, window, surface))
 }
 

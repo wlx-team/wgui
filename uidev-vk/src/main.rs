@@ -54,7 +54,7 @@ fn init_logging() {
 }
 
 fn load_testbed() -> anyhow::Result<Box<dyn Testbed>> {
-	let name = std::env::var("TESTBED").unwrap_or(String::new());
+	let name = std::env::var("TESTBED").unwrap_or_default();
 	Ok(match name.as_str() {
 		"dashboard" => Box::new(TestbedDashboard::new()?),
 		_ => Box::new(TestbedGeneric::new()?),
@@ -68,16 +68,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 	let inner_size = window.inner_size();
 	let mut swapchain_size = [inner_size.width, inner_size.height];
 
-	let native_format = gfx
-		.device
-		.physical_device()
-		.surface_formats(&surface, SurfaceInfo::default())
-		.unwrap()[0] // want panic
-		.0;
-	log::info!("Using surface format: {native_format:?}");
-
 	let mut swapchain_create_info =
-		swapchain_create_info(&gfx, native_format, surface.clone(), swapchain_size);
+		swapchain_create_info(&gfx, gfx.surface_format, surface.clone(), swapchain_size);
 
 	let (mut swapchain, mut images) = {
 		let (swapchain, images) = Swapchain::new(
@@ -103,7 +95,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
 	let mut mouse = Vec2::ZERO;
 
-	let mut render_context = renderer_vk::context::Context::new(gfx.clone(), native_format, scale)?;
+	let mut render_context =
+		renderer_vk::context::Context::new(gfx.clone(), gfx.surface_format, scale)?;
 
 	render_context.update_viewport(swapchain_size, scale)?;
 	println!("new swapchain_size: {swapchain_size:?}");
@@ -277,7 +270,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 						.unwrap();
 					cmd_buf.begin_rendering(tgt).unwrap();
 
-					let primitives = wgui::drawing::draw(&testbed.layout()).unwrap();
+					let primitives = wgui::drawing::draw(testbed.layout()).unwrap();
 					render_context
 						.draw(&gfx, &mut cmd_buf, &primitives)
 						.unwrap();

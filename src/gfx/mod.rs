@@ -70,6 +70,8 @@ pub struct WGfx {
 
 	pub texture_filter: Filter,
 
+	pub surface_format: Format,
+
 	pub memory_allocator: Arc<StandardMemoryAllocator>,
 	pub command_buffer_allocator: Arc<StandardCommandBufferAllocator>,
 	pub descriptor_set_allocator: Arc<StandardDescriptorSetAllocator>,
@@ -81,6 +83,7 @@ impl WGfx {
 		device: Arc<Device>,
 		queue_gfx: Arc<Queue>,
 		queue_xfer: Arc<Queue>,
+		surface_format: Format,
 	) -> Arc<Self> {
 		let memory_allocator = memory_allocator(device.clone());
 		let command_buffer_allocator = Arc::new(StandardCommandBufferAllocator::new(
@@ -106,6 +109,7 @@ impl WGfx {
 			device,
 			queue_gfx,
 			queue_xfer,
+			surface_format,
 			texture_filter: quality_filter,
 			memory_allocator,
 			command_buffer_allocator,
