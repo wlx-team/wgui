@@ -20,7 +20,7 @@ pub struct WGfxPass<V>
 where
 	V: BufferContents + Vertex,
 {
-	pub(super) command_buffer: Arc<SecondaryAutoCommandBuffer>,
+	pub command_buffer: Arc<SecondaryAutoCommandBuffer>,
 	_dummy: PhantomData<V>,
 }
 

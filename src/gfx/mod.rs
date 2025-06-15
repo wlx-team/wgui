@@ -67,7 +67,6 @@ pub struct WGfx {
 
 	pub queue_gfx: Arc<Queue>,
 	pub queue_xfer: Arc<Queue>,
-	pub queue_gfx_alt: Option<Arc<Queue>>,
 
 	pub texture_filter: Filter,
 
@@ -82,7 +81,6 @@ impl WGfx {
 		device: Arc<Device>,
 		queue_gfx: Arc<Queue>,
 		queue_xfer: Arc<Queue>,
-		queue_gfx_alt: Option<Arc<Queue>>,
 	) -> Arc<Self> {
 		let memory_allocator = memory_allocator(device.clone());
 		let command_buffer_allocator = Arc::new(StandardCommandBufferAllocator::new(
@@ -108,7 +106,6 @@ impl WGfx {
 			device,
 			queue_gfx,
 			queue_xfer,
-			queue_gfx_alt,
 			texture_filter: quality_filter,
 			memory_allocator,
 			command_buffer_allocator,
@@ -203,14 +200,22 @@ impl WGfx {
 		self: &Arc<Self>,
 		usage: CommandBufferUsage,
 	) -> anyhow::Result<GfxCommandBuffer> {
+		self.create_gfx_command_buffer_with_queue(self.queue_gfx.clone(), usage)
+	}
+
+	pub fn create_gfx_command_buffer_with_queue(
+		self: &Arc<Self>,
+		queue: Arc<Queue>,
+		usage: CommandBufferUsage,
+	) -> anyhow::Result<GfxCommandBuffer> {
 		let command_buffer = AutoCommandBufferBuilder::primary(
 			self.command_buffer_allocator.clone(),
-			self.queue_gfx.queue_family_index(),
+			queue.queue_family_index(),
 			usage,
 		)?;
 		Ok(GfxCommandBuffer {
 			graphics: self.clone(),
-			queue: self.queue_gfx.clone(),
+			queue,
 			command_buffer,
 			_dummy: PhantomData,
 		})
@@ -220,14 +225,22 @@ impl WGfx {
 		self: &Arc<Self>,
 		usage: CommandBufferUsage,
 	) -> anyhow::Result<XferCommandBuffer> {
+		self.create_xfer_command_buffer_with_queue(self.queue_gfx.clone(), usage)
+	}
+
+	pub fn create_xfer_command_buffer_with_queue(
+		self: &Arc<Self>,
+		queue: Arc<Queue>,
+		usage: CommandBufferUsage,
+	) -> anyhow::Result<XferCommandBuffer> {
 		let command_buffer = AutoCommandBufferBuilder::primary(
 			self.command_buffer_allocator.clone(),
-			self.queue_xfer.queue_family_index(),
+			queue.queue_family_index(),
 			usage,
 		)?;
 		Ok(XferCommandBuffer {
 			graphics: self.clone(),
-			queue: self.queue_xfer.clone(),
+			queue,
 			command_buffer,
 			_dummy: PhantomData,
 		})

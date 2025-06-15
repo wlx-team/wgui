@@ -26,9 +26,9 @@ pub struct CmdBufGfx;
 pub struct CmdBufXfer;
 
 pub struct WCommandBuffer<T> {
-	pub(super) graphics: Arc<WGfx>,
-	pub(super) queue: Arc<Queue>,
-	pub(super) command_buffer: AutoCommandBufferBuilder<PrimaryAutoCommandBuffer>,
+	pub graphics: Arc<WGfx>,
+	pub queue: Arc<Queue>,
+	pub command_buffer: AutoCommandBufferBuilder<PrimaryAutoCommandBuffer>,
 	pub(super) _dummy: PhantomData<T>,
 }
 
