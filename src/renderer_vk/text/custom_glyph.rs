@@ -16,14 +16,14 @@ static AUTO_INCREMENT: AtomicUsize = AtomicUsize::new(0);
 
 #[derive(Debug, Clone)]
 pub enum CustomGlyphContent {
-	Svg(Tree),
+	Svg(Box<Tree>),
 	Image(RgbaImage),
 }
 
 impl CustomGlyphContent {
 	pub fn from_bin_svg(data: &[u8]) -> anyhow::Result<Self> {
 		let tree = Tree::from_data(data, &Options::default())?;
-		Ok(CustomGlyphContent::Svg(tree))
+		Ok(CustomGlyphContent::Svg(Box::new(tree)))
 	}
 
 	pub fn from_bin_raster(data: &[u8]) -> anyhow::Result<Self> {

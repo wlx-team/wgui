@@ -106,7 +106,7 @@ pub fn init_window() -> anyhow::Result<(
 
 	let (queue_gfx, queue_xfer, _) = unwrap_queues(queues.collect());
 
-	let me = WGfx::new_from_raw(instance, device, queue_gfx, queue_xfer);
+	let me = WGfx::new_from_raw(instance, device, queue_gfx, queue_xfer, None);
 	Ok((me, event_loop, window, surface))
 }
 

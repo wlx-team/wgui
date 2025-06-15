@@ -135,7 +135,7 @@ impl InnerAtlas {
 
 	fn descriptor_set(kind: Kind) -> usize {
 		match kind {
-			Kind::Color { .. } => 0,
+			Kind::Color => 0,
 			Kind::Mask => 1,
 		}
 	}

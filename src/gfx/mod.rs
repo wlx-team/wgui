@@ -55,6 +55,11 @@ pub struct Vert2Uv {
 	pub in_uv: [f32; 2],
 }
 
+pub enum QueueType {
+	Graphics,
+	Transfer,
+}
+
 #[derive(Clone)]
 pub struct WGfx {
 	pub instance: Arc<Instance>,
@@ -62,6 +67,7 @@ pub struct WGfx {
 
 	pub queue_gfx: Arc<Queue>,
 	pub queue_xfer: Arc<Queue>,
+	pub queue_gfx_alt: Option<Arc<Queue>>,
 
 	pub texture_filter: Filter,
 
@@ -76,6 +82,7 @@ impl WGfx {
 		device: Arc<Device>,
 		queue_gfx: Arc<Queue>,
 		queue_xfer: Arc<Queue>,
+		queue_gfx_alt: Option<Arc<Queue>>,
 	) -> Arc<Self> {
 		let memory_allocator = memory_allocator(device.clone());
 		let command_buffer_allocator = Arc::new(StandardCommandBufferAllocator::new(
@@ -101,6 +108,7 @@ impl WGfx {
 			device,
 			queue_gfx,
 			queue_xfer,
+			queue_gfx_alt,
 			texture_filter: quality_filter,
 			memory_allocator,
 			command_buffer_allocator,

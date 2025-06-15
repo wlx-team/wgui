@@ -235,7 +235,7 @@ impl Layout {
 			widget_node_map,
 			widget_states,
 			needs_redraw: true,
-			animations: Animations::new(),
+			animations: Animations::default(),
 			assets,
 		})
 	}

@@ -139,17 +139,12 @@ impl Animation {
 	}
 }
 
+#[derive(Default)]
 pub struct Animations {
 	running_animations: Vec<Animation>,
 }
 
 impl Animations {
-	pub fn new() -> Self {
-		Self {
-			running_animations: Vec::new(),
-		}
-	}
-
 	pub fn tick(
 		&mut self,
 		widgets: &WidgetMap,
