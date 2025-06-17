@@ -128,7 +128,8 @@ impl WGfx {
 				..Default::default()
 			},
 			AllocationCreateInfo {
-				memory_type_filter: MemoryTypeFilter::PREFER_HOST | MemoryTypeFilter::HOST_SEQUENTIAL_WRITE,
+				memory_type_filter: MemoryTypeFilter::PREFER_DEVICE
+					| MemoryTypeFilter::HOST_SEQUENTIAL_WRITE,
 				..Default::default()
 			},
 			capacity,
@@ -150,7 +151,8 @@ impl WGfx {
 				..Default::default()
 			},
 			AllocationCreateInfo {
-				memory_type_filter: MemoryTypeFilter::PREFER_HOST | MemoryTypeFilter::HOST_SEQUENTIAL_WRITE,
+				memory_type_filter: MemoryTypeFilter::PREFER_DEVICE
+					| MemoryTypeFilter::HOST_SEQUENTIAL_WRITE,
 				..Default::default()
 			},
 			contents.cloned(),
@@ -189,7 +191,7 @@ impl WGfx {
 	where
 		V: BufferContents + Vertex,
 	{
-		Ok(Arc::new(WGfxPipeline::new(
+		Ok(Arc::new(WGfxPipeline::new_with_vert_input(
 			self.clone(),
 			vert,
 			frag,
@@ -197,6 +199,24 @@ impl WGfx {
 			blend,
 			topology,
 			instanced,
+		)?))
+	}
+
+	pub fn create_pipeline_procedural(
+		self: &Arc<Self>,
+		vert: Arc<ShaderModule>,
+		frag: Arc<ShaderModule>,
+		format: Format,
+		blend: Option<AttachmentBlend>,
+		topology: PrimitiveTopology,
+	) -> anyhow::Result<Arc<WGfxPipeline<()>>> {
+		Ok(Arc::new(WGfxPipeline::new_procedural(
+			self.clone(),
+			vert,
+			frag,
+			format,
+			blend,
+			topology,
 		)?))
 	}
 

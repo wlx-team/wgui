@@ -4,13 +4,15 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-anyhow = "1.0.98"
-glam = "0.30.3"
-log = "0.4.27"
+anyhow = { workspace = true }
+glam = { workspace = true }
+log = { workspace = true }
 rust-embed = "8.7.2"
 tracing-subscriber = { version = "0.3.19", features = ["env-filter"] }
 wgui = { path = "../" }
 winit = "0.30.10"
+vulkano = { workspace = true }
+vulkano-shaders = { workspace = true }
 
 [profile.dev]
 opt-level = 0

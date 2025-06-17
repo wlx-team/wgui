@@ -4,10 +4,10 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-anyhow = "1.0.98"
+anyhow = { workspace = true }
 cosmic-text = "0.14.2"
 etagere = "0.2.15"
-glam = "0.30.3"
+glam = { workspace = true }
 image = { version = "0.25.6", default-features = false, features = [
   "gif",
   "jpeg",
@@ -15,7 +15,7 @@ image = { version = "0.25.6", default-features = false, features = [
   "rayon",
   "webp",
 ] }
-log = "0.4.27"
+log = { workspace = true }
 lru = "0.14.0"
 resvg = { version = "0.45.1", default-features = false }
 roxmltree = "0.20.0"
@@ -23,10 +23,8 @@ rustc-hash = "2.1.1"
 slotmap = "1.0.7"
 smallvec = "1.15.0"
 taffy = "0.8.1"
-vulkano = { version = "0.35.1", default-features = false, features = [
-  "macros",
-] }
-vulkano-shaders = "0.35.0"
+vulkano = { workspace = true }
+vulkano-shaders = { workspace = true }
 
 [profile.dev]
 opt-level = 0

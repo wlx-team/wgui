@@ -2,7 +2,7 @@ use std::{marker::PhantomData, sync::Arc};
 
 use vulkano::{
 	DeviceSize,
-	buffer::{Buffer, BufferContents, BufferCreateInfo, BufferUsage, Subbuffer},
+	buffer::{Buffer, BufferCreateInfo, BufferUsage, Subbuffer},
 	command_buffer::{
 		AutoCommandBufferBuilder, CommandBufferExecFuture, CopyBufferToImageInfo, CopyImageInfo,
 		PrimaryAutoCommandBuffer, PrimaryCommandBufferAbstract, RenderingAttachmentInfo, RenderingInfo,
@@ -12,7 +12,6 @@ use vulkano::{
 	format::Format,
 	image::{Image, ImageCreateInfo, ImageType, ImageUsage, view::ImageView},
 	memory::allocator::{AllocationCreateInfo, MemoryTypeFilter},
-	pipeline::graphics::vertex_input::Vertex,
 	render_pass::{AttachmentLoadOp, AttachmentStoreOp},
 	sync::{GpuFuture, future::NowFuture},
 };
@@ -67,7 +66,7 @@ impl WCommandBuffer<CmdBufGfx> {
 
 	pub fn run_ref<T>(&mut self, pass: &WGfxPass<T>) -> anyhow::Result<()>
 	where
-		T: BufferContents + Vertex,
+		T: Sized,
 	{
 		self
 			.command_buffer

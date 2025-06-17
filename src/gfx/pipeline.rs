@@ -22,20 +22,17 @@ use vulkano::{
 			multisample::MultisampleState,
 			rasterization::RasterizationState,
 			subpass::PipelineRenderingCreateInfo,
-			vertex_input::{Vertex, VertexDefinition},
+			vertex_input::{Vertex, VertexDefinition, VertexInputState},
 			viewport::ViewportState,
 		},
 		layout::PipelineDescriptorSetLayoutCreateInfo,
 	},
-	shader::ShaderModule,
+	shader::{EntryPoint, ShaderModule},
 };
 
 use super::{WGfx, pass::WGfxPass};
 
-pub struct WGfxPipeline<V>
-where
-	V: BufferContents + Vertex,
-{
+pub struct WGfxPipeline<V> {
 	pub graphics: Arc<WGfx>,
 	pub pipeline: Arc<GraphicsPipeline>,
 	pub format: Format,
@@ -44,29 +41,20 @@ where
 
 impl<V> WGfxPipeline<V>
 where
-	V: BufferContents + Vertex,
+	V: Sized,
 {
-	pub(super) fn new(
+	fn new_from_stages(
 		graphics: Arc<WGfx>,
-		vert: Arc<ShaderModule>,
-		frag: Arc<ShaderModule>,
 		format: Format,
 		blend: Option<AttachmentBlend>,
 		topology: PrimitiveTopology,
-		instanced: bool,
+		vert_entry_point: EntryPoint,
+		frag_entry_point: EntryPoint,
+		vertex_input_state: Option<VertexInputState>,
 	) -> anyhow::Result<Self> {
-		let vep = vert.entry_point("main").unwrap(); // want panic
-		let fep = frag.entry_point("main").unwrap(); // want panic
-
-		let vertex_input_state = if instanced {
-			V::per_instance().definition(&vep)?
-		} else {
-			V::per_vertex().definition(&vep)?
-		};
-
 		let stages = smallvec![
-			vulkano::pipeline::PipelineShaderStageCreateInfo::new(vep),
-			vulkano::pipeline::PipelineShaderStageCreateInfo::new(fep),
+			vulkano::pipeline::PipelineShaderStageCreateInfo::new(vert_entry_point),
+			vulkano::pipeline::PipelineShaderStageCreateInfo::new(frag_entry_point),
 		];
 
 		let layout = PipelineLayout::new(
@@ -85,7 +73,7 @@ where
 			None,
 			GraphicsPipelineCreateInfo {
 				stages,
-				vertex_input_state: Some(vertex_input_state),
+				vertex_input_state,
 				input_assembly_state: Some(InputAssemblyState {
 					topology,
 					..InputAssemblyState::default()
@@ -115,40 +103,6 @@ where
 			format,
 			_dummy: PhantomData,
 		})
-	}
-
-	pub fn create_pass_instanced(
-		self: &Arc<Self>,
-		dimensions: [f32; 2],
-		vertex_buffer: Subbuffer<[V]>,
-		vertices: Range<u32>,
-		instances: Range<u32>,
-		descriptor_sets: Vec<Arc<DescriptorSet>>,
-	) -> anyhow::Result<WGfxPass<V>> {
-		WGfxPass::new_instanced(
-			self.clone(),
-			dimensions,
-			vertex_buffer,
-			vertices,
-			instances,
-			descriptor_sets,
-		)
-	}
-
-	pub fn create_pass_indexed(
-		self: &Arc<Self>,
-		dimensions: [f32; 2],
-		vertex_buffer: Subbuffer<[V]>,
-		index_buffer: IndexBuffer,
-		descriptor_sets: Vec<Arc<DescriptorSet>>,
-	) -> anyhow::Result<WGfxPass<V>> {
-		WGfxPass::new_indexed(
-			self.clone(),
-			dimensions,
-			vertex_buffer,
-			index_buffer,
-			descriptor_sets,
-		)
 	}
 
 	pub fn inner(&self) -> Arc<GraphicsPipeline> {
@@ -220,5 +174,113 @@ where
 		};
 
 		self.buffer(set, uniform_buffer_subbuffer)
+	}
+}
+
+impl WGfxPipeline<()> {
+	pub(super) fn new_procedural(
+		graphics: Arc<WGfx>,
+		vert: Arc<ShaderModule>,
+		frag: Arc<ShaderModule>,
+		format: Format,
+		blend: Option<AttachmentBlend>,
+		topology: PrimitiveTopology,
+	) -> anyhow::Result<Self> {
+		let vert_entry_point = vert.entry_point("main").unwrap(); // want panic
+		let frag_entry_point = frag.entry_point("main").unwrap(); // want panic
+
+		WGfxPipeline::new_from_stages(
+			graphics,
+			format,
+			blend,
+			topology,
+			vert_entry_point,
+			frag_entry_point,
+			None,
+		)
+	}
+
+	pub fn create_pass_procedural(
+		self: &Arc<Self>,
+		dimensions: [f32; 2],
+		vertices: Range<u32>,
+		instances: Range<u32>,
+		descriptor_sets: Vec<Arc<DescriptorSet>>,
+	) -> anyhow::Result<WGfxPass<()>> {
+		WGfxPass::new_procedural(
+			self.clone(),
+			dimensions,
+			vertices,
+			instances,
+			descriptor_sets,
+		)
+	}
+}
+
+impl<V> WGfxPipeline<V>
+where
+	V: BufferContents + Vertex,
+{
+	pub(super) fn new_with_vert_input(
+		graphics: Arc<WGfx>,
+		vert: Arc<ShaderModule>,
+		frag: Arc<ShaderModule>,
+		format: Format,
+		blend: Option<AttachmentBlend>,
+		topology: PrimitiveTopology,
+		instanced: bool,
+	) -> anyhow::Result<Self> {
+		let vert_entry_point = vert.entry_point("main").unwrap(); // want panic
+		let frag_entry_point = frag.entry_point("main").unwrap(); // want panic
+
+		let vertex_input_state = Some(if instanced {
+			V::per_instance().definition(&vert_entry_point)?
+		} else {
+			V::per_vertex().definition(&vert_entry_point)?
+		});
+
+		WGfxPipeline::new_from_stages(
+			graphics,
+			format,
+			blend,
+			topology,
+			vert_entry_point,
+			frag_entry_point,
+			vertex_input_state,
+		)
+	}
+
+	pub fn create_pass(
+		self: &Arc<Self>,
+		dimensions: [f32; 2],
+		vertex_buffer: Subbuffer<[V]>,
+		vertices: Range<u32>,
+		instances: Range<u32>,
+		descriptor_sets: Vec<Arc<DescriptorSet>>,
+	) -> anyhow::Result<WGfxPass<V>> {
+		WGfxPass::new_instanced(
+			self.clone(),
+			dimensions,
+			vertex_buffer,
+			vertices,
+			instances,
+			descriptor_sets,
+		)
+	}
+
+	pub fn create_pass_indexed(
+		self: &Arc<Self>,
+		dimensions: [f32; 2],
+		vertex_buffer: Subbuffer<[V]>,
+		index_buffer: IndexBuffer,
+		descriptor_sets: Vec<Arc<DescriptorSet>>,
+	) -> anyhow::Result<WGfxPass<V>> {
+		WGfxPass::new_indexed(
+			self.clone(),
+			dimensions,
+			vertex_buffer,
+			index_buffer,
+			descriptor_sets,
+		)
 	}
 }

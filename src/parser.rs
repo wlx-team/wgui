@@ -53,7 +53,7 @@ struct ParserFile<'a> {
 }
 
 // Parses a color from a HTML hex string
-fn parse_color_hex(html_hex: &str) -> Option<drawing::Color> {
+pub fn parse_color_hex(html_hex: &str) -> Option<drawing::Color> {
 	if html_hex.len() == 7 {
 		if let (Ok(r), Ok(g), Ok(b)) = (
 			u8::from_str_radix(&html_hex[1..3], 16),

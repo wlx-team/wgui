@@ -1,14 +1,13 @@
 use std::sync::{Arc, OnceLock};
-use wgui::gfx::WGfx;
-use wgui::vulkano::swapchain::SurfaceInfo;
-use wgui::vulkano::{
-	self,
+use vulkano::{
 	device::{
 		Device, DeviceCreateInfo, DeviceExtensions, DeviceFeatures, Queue, QueueCreateInfo, QueueFlags,
 		physical::{PhysicalDevice, PhysicalDeviceType},
 	},
 	instance::{Instance, InstanceCreateInfo},
+	swapchain::SurfaceInfo,
 };
+use wgui::gfx::WGfx;
 
 static VULKAN_LIBRARY: OnceLock<Arc<vulkano::VulkanLibrary>> = OnceLock::new();
 fn get_vulkan_library() -> &'static Arc<vulkano::VulkanLibrary> {

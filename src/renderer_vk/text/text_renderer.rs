@@ -261,7 +261,7 @@ impl TextRenderer {
 
 		let res = viewport.resolution();
 
-		let pass = self.pipeline.inner.create_pass_instanced(
+		let pass = self.pipeline.inner.create_pass(
 			[res[0] as _, res[1] as _],
 			self.vertex_buffer.clone(),
 			0..4,

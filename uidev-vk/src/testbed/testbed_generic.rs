@@ -1,10 +1,9 @@
 use std::{cell::RefCell, rc::Rc};
 
-use glam::Mat4;
+use glam::{Mat4, Vec2};
 use wgui::{
 	drawing::{self},
 	event::EventListener,
-	glam::Vec2,
 	layout::{Layout, WidgetID},
 	renderer_vk::text::TextStyle,
 };

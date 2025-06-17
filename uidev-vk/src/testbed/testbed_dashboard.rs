@@ -1,6 +1,6 @@
-use wgui::{glam::Vec2, layout::Layout};
-
 use crate::{assets, testbed::Testbed};
+use glam::Vec2;
+use wgui::layout::Layout;
 
 pub struct TestbedDashboard {
 	pub layout: Layout,

@@ -142,7 +142,7 @@ impl RectRenderer {
 		let set0 = viewport.get_rect_descriptor(&self.pipeline);
 		let set1 = self.model_buffer.get_rect_descriptor(&self.pipeline);
 
-		let pass = self.pipeline.color_rect.create_pass_instanced(
+		let pass = self.pipeline.color_rect.create_pass(
 			[vp[0] as _, vp[1] as _],
 			self.vert_buffer.clone(),
 			0..4,

@@ -7,21 +7,20 @@ use tracing_subscriber::filter::LevelFilter;
 use tracing_subscriber::layer::SubscriberExt;
 use tracing_subscriber::util::SubscriberInitExt;
 use vulkan::init_window;
+use vulkano::{
+	Validated, VulkanError,
+	command_buffer::CommandBufferUsage,
+	format::Format,
+	image::{ImageUsage, view::ImageView},
+	swapchain::{
+		Surface, SurfaceInfo, Swapchain, SwapchainCreateInfo, SwapchainPresentInfo, acquire_next_image,
+	},
+	sync::GpuFuture,
+};
 use wgui::{
 	event::{MouseDownEvent, MouseMotionEvent, MouseUpEvent, MouseWheelEvent},
 	gfx::WGfx,
 	renderer_vk::{self},
-	vulkano::{
-		Validated, VulkanError,
-		command_buffer::CommandBufferUsage,
-		format::Format,
-		image::{ImageUsage, view::ImageView},
-		swapchain::{
-			Surface, SurfaceInfo, Swapchain, SwapchainCreateInfo, SwapchainPresentInfo,
-			acquire_next_image,
-		},
-		sync::GpuFuture,
-	},
 };
 use winit::{
 	event::{ElementState, Event, MouseScrollDelta, WindowEvent},
