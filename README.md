@@ -1,3 +1,7 @@
+# This project has been merged directly into WayVR.
+
+---
+
 <p align="center">
 	<img alt=" logo" src="./contrib/logo.png"/>
 </p>
